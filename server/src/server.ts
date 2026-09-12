@@ -1,3 +1,4 @@
+import './lib/bigintJson';
 import { createApp } from './app';
 import { env } from './config/env';
 

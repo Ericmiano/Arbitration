@@ -11,7 +11,10 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "prisma:pull": "prisma db pull",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
+    "job:overdue": "node dist/jobs/flagOverdueAssignments.js",
+    "job:overdue:dev": "tsx src/jobs/flagOverdueAssignments.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

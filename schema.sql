@@ -107,20 +107,6 @@ CREATE INDEX idx_conflicts_arbitrator ON arbitrator_conflicts(arbitrator_id);
 CREATE INDEX idx_conflicts_party ON arbitrator_conflicts(conflicted_party_id);
 CREATE INDEX idx_conflicts_org ON arbitrator_conflicts(conflicted_organization_id);
 
--- Score history: one row appended each time a case closes and the arbitrator's score is recalculated.
-CREATE TABLE arbitrator_score_history (
-    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    arbitrator_id       BIGINT UNSIGNED NOT NULL,
-    case_id             BIGINT UNSIGNED NULL,                -- the case that triggered this recalculation
-    score               DECIMAL(5,2) NOT NULL,
-    timeliness_component DECIMAL(5,2) NOT NULL,
-    outcome_component   DECIMAL(5,2) NOT NULL,
-    workload_component  DECIMAL(5,2) NOT NULL,
-    calculated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_score_arbitrator FOREIGN KEY (arbitrator_id) REFERENCES arbitrators(id) ON DELETE CASCADE,
-    CONSTRAINT fk_score_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
 -- ============================================================
 -- PROJECTS & CONTRACTS
 -- ============================================================
@@ -220,6 +206,23 @@ CREATE TABLE case_parties (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_caseparties_party ON case_parties(party_id);
+
+-- Score history: one row appended each time a case closes and the arbitrator's score is recalculated.
+-- (Placed here, rather than under ARBITRATORS above, because it references `cases`.)
+CREATE TABLE arbitrator_score_history (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    arbitrator_id       BIGINT UNSIGNED NOT NULL,
+    case_id             BIGINT UNSIGNED NULL,                -- the case that triggered this recalculation
+    score               DECIMAL(5,2) NOT NULL,
+    timeliness_component DECIMAL(5,2) NOT NULL,
+    outcome_component   DECIMAL(5,2) NOT NULL,
+    workload_component  DECIMAL(5,2) NOT NULL,
+    calculated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_score_arbitrator FOREIGN KEY (arbitrator_id) REFERENCES arbitrators(id) ON DELETE CASCADE,
+    CONSTRAINT fk_score_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_score_history_arbitrator ON arbitrator_score_history(arbitrator_id);
 
 -- ============================================================
 -- ASSIGNMENTS
