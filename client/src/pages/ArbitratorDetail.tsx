@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getArbitrator } from '../api/arbitrators';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
-import { Arbitrator } from '../types';
+import { ArbitratorProfile } from '../types';
 
 export function ArbitratorDetail() {
   const { arbitratorId } = useParams();
-  const [arbitrator, setArbitrator] = useState<Arbitrator | null>(null);
+  const [arbitrator, setArbitrator] = useState<ArbitratorProfile | null>(null);
 
   useEffect(() => {
     if (arbitratorId) getArbitrator(arbitratorId).then(setArbitrator);
@@ -43,7 +43,7 @@ export function ArbitratorDetail() {
         <Stat value={String(arbitrator.cases_closed_count)} label="CASES CLOSED" />
         <Stat value={arbitrator.years_of_practice ? `${arbitrator.years_of_practice}y` : '—'} label="PRACTICE" />
         <Stat
-          value={String((arbitrator.assignments ?? []).filter((a) => ['ongoing', 'overdue', 'escalated'].includes(a.status)).length)}
+          value={String(arbitrator.assignments.filter((a) => ['ongoing', 'overdue', 'escalated'].includes(a.status)).length)}
           label="ACTIVE CASES"
         />
       </div>
@@ -116,15 +116,13 @@ export function ArbitratorDetail() {
 
       <div className="px-20 py-14">
         <div className="font-mono text-9.5 tracking-[0.12em] text-muted">ASSIGNMENT HISTORY</div>
-        {(arbitrator.assignments ?? []).length === 0 ? (
+        {arbitrator.assignments.length === 0 ? (
           <p className="mt-8 text-13 text-muted">No assignments yet.</p>
         ) : (
           <div className="mt-8">
-            {arbitrator.assignments!.map((a) => (
+            {arbitrator.assignments.map((a) => (
               <div key={a.id} className="py-8 border-t border-hairline flex flex-wrap gap-x-16 gap-y-4 items-baseline">
-                <span className="font-mono text-12 flex-[0_0_140px]">
-                  {(a as unknown as { cases: { case_number: string } }).cases.case_number}
-                </span>
+                <span className="font-mono text-12 flex-[0_0_140px]">{a.cases.case_number}</span>
                 <span className="font-mono text-10.5 text-muted flex-[0_0_100px] uppercase">{a.status}</span>
                 <span className="font-mono text-10.5 text-muted-2">
                   due {new Date(a.due_date).toLocaleDateString()}

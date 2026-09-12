@@ -27,42 +27,52 @@ export function Login() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: '4rem auto' }}>
-      <form onSubmit={handleSubmit}>
-        <h1>AAK Arbitration</h1>
-        <div>
-          <label htmlFor="email">Email</label>
-          <br />
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%' }}
-          />
+    <div className="min-h-screen bg-app-bg flex items-center justify-center px-16">
+      <div className="w-full max-w-[360px] bg-sheet border border-ink px-30 py-34">
+        <div className="font-mono text-15 font-semibold tracking-[0.16em] text-ink">
+          A<span className="text-red">A</span>K
         </div>
-        <div style={{ marginTop: '0.5rem' }}>
-          <label htmlFor="password">Password</label>
-          <br />
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%' }}
-          />
-        </div>
-        {error && (
-          <p role="alert" style={{ color: 'crimson' }}>
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={submitting} style={{ marginTop: '1rem' }}>
-          {submitting ? 'Signing in...' : 'Log in'}
-        </button>
-      </form>
-    </main>
+        <div className="mt-5 font-mono text-9.5 tracking-[0.14em] text-muted">ARBITRATION REGISTER</div>
+
+        <form onSubmit={handleSubmit} className="mt-24 flex flex-col gap-16">
+          <label className="flex flex-col gap-6">
+            <span className="font-mono text-9.5 tracking-[0.11em] text-muted uppercase">Email</span>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="border-0 border-b border-rule bg-transparent py-6 text-13 outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-6">
+            <span className="font-mono text-9.5 tracking-[0.11em] text-muted uppercase">Password</span>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="border-0 border-b border-rule bg-transparent py-6 text-13 outline-none"
+            />
+          </label>
+
+          {error && (
+            <p role="alert" className="text-12.5 text-red">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-4 min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer whitespace-nowrap hover:bg-red-hover disabled:opacity-60"
+          >
+            {submitting ? 'Signing in...' : 'Log in'}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }

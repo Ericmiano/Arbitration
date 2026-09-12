@@ -1,228 +1,159 @@
-import { CSSProperties, FormEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { createCase, listCases } from '../api/cases';
-import { listParties } from '../api/parties';
-import { listProjects } from '../api/projects';
-import { useAuth } from '../context/AuthContext';
-import { Case, Party, Project } from '../types';
+import { listCases } from '../api/cases';
+import {
+  arbitratorLabel,
+  deadlineLine,
+  disputeLine,
+  GROUP_DEFS,
+  groupKeyForCase,
+  marginNote,
+  partyLine,
+  statusTone,
+} from '../lib/caseDisplay';
+import { Case } from '../types';
+
+const FILTERS = [
+  { label: 'All', key: null },
+  { label: 'Overdue', key: 'overdue' },
+  { label: 'Awaiting appointment', key: 'appoint' },
+  { label: 'In progress', key: 'progress' },
+  { label: 'Concluded', key: 'closed' },
+] as const;
 
 export function Cases() {
-  const { user } = useAuth();
-  const isStaff = user?.role === 'admin' || user?.role === 'registrar' || user?.role === 'staff';
-
-  const [cases, setCases] = useState<Case[]>([]);
-  const [parties, setParties] = useState<Party[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
-
-  function reload() {
-    listCases().then(setCases);
-  }
+  const [cases, setCases] = useState<Case[] | null>(null);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>(null);
 
   useEffect(() => {
-    reload();
-    if (isStaff) {
-      listParties().then(setParties);
-      listProjects().then(setProjects);
-    }
-  }, [isStaff]);
+    listCases().then(setCases);
+  }, []);
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    const form = new FormData(event.currentTarget);
+  if (!cases) return <p>Loading...</p>;
 
-    const claimantId = Number(form.get('claimantId'));
-    const respondentId = Number(form.get('respondentId'));
-    const projectId = form.get('projectId') ? Number(form.get('projectId')) : undefined;
-    const contractId = form.get('contractId') ? Number(form.get('contractId')) : undefined;
+  const numbered = cases.map((c, i) => ({ c, no: String(i + 1).padStart(2, '0') }));
+  const filtered = filter ? numbered.filter(({ c }) => groupKeyForCase(c) === filter) : numbered;
 
-    try {
-      await createCase({
-        projectId,
-        contractId,
-        disputeValue: Number(form.get('disputeValue')),
-        currency: String(form.get('currency') || 'KES'),
-        category: String(form.get('category')),
-        description: String(form.get('description')),
-        basis: form.get('basis') as 'contractual_clause' | 'mutual_agreement',
-        parties: [
-          { partyId: claimantId, role: 'claimant' },
-          { partyId: respondentId, role: 'respondent' },
-        ],
-      });
-      setShowForm(false);
-      reload();
-    } catch (err) {
-      const message = (err as { response?: { data?: { error?: unknown } } }).response?.data?.error;
-      setError(typeof message === 'string' ? message : 'Failed to create case');
-    }
-  }
-
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const counts = Object.fromEntries(
+    FILTERS.map((f) => [
+      f.label,
+      f.key === null ? cases.length : cases.filter((c) => groupKeyForCase(c) === f.key).length,
+    ]),
+  );
 
   return (
-    <div>
-      <h1>Cases</h1>
-
-      {isStaff && (
-        <button type="button" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? 'Cancel' : 'New Case'}
-        </button>
-      )}
-
-      {showForm && (
-        <form onSubmit={handleCreate} style={{ marginTop: '1rem', maxWidth: 480 }}>
-          <div>
-            <label>
-              Basis for arbitration
-              <br />
-              <select name="basis" required defaultValue="contractual_clause">
-                <option value="contractual_clause">Contract has an arbitration clause</option>
-                <option value="mutual_agreement">No clause - parties mutually agreed</option>
-              </select>
-            </label>
+    <div className="bg-sheet border border-ink">
+      <div className="px-24 pt-22 pb-18 flex flex-wrap gap-x-26 gap-y-18 items-end border-b border-ink">
+        <div className="flex-1 min-w-[300px]">
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em] leading-[1.1]">All cases</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
+            {cases.length} arbitration{cases.length === 1 ? '' : 's'} on the register
           </div>
+        </div>
+      </div>
 
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Project (optional)
-              <br />
-              <select
-                name="projectId"
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-              >
-                <option value="">-- none --</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+      <div className="flex flex-wrap border-b border-rule bg-band-alt">
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => setFilter(f.key)}
+              className={`flex items-center gap-7 px-16 py-9 whitespace-nowrap text-12.5 border-0 cursor-pointer ${
+                active ? 'bg-sheet font-semibold text-ink shadow-[inset_0_-2px_0_#A5121C]' : 'bg-transparent text-ink-2'
+              }`}
+            >
+              {f.label} <span className="font-mono text-10.5 text-muted">{counts[f.label]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {GROUP_DEFS.map((group) => {
+        const rows = filtered.filter(({ c }) => groupKeyForCase(c) === group.key);
+        if (rows.length === 0) return null;
+
+        return (
+          <div key={group.key}>
+            <div className="flex flex-wrap gap-x-12 gap-y-6 items-baseline px-24 py-9 bg-band border-b border-rule">
+              <span className={`w-7 h-7 inline-block ${group.tone.replace('text-', 'bg-')}`} />
+              <span className={`font-mono text-10.5 font-semibold tracking-[0.13em] ${group.tone}`}>
+                {group.label}
+              </span>
+              <span className="font-mono text-10.5 text-muted">{String(rows.length).padStart(2, '0')}</span>
+              <span className="text-12 text-ink-2">{group.note}</span>
+            </div>
+
+            {group.dense
+              ? rows.map(({ c }) => (
+                  <Link
+                    key={c.id}
+                    to={`/cases/${c.id}`}
+                    className="no-underline text-ink flex flex-wrap gap-x-16 gap-y-4 items-baseline cursor-pointer px-24 py-10 border-b border-hairline hover:bg-row-hover hover:text-ink"
+                  >
+                    <span className="font-mono text-11.5 tracking-[0.04em] flex-[0_0_106px]">{c.case_number}</span>
+                    <span className="flex-[2_1_220px] min-w-0 text-13.5 font-medium">
+                      {c.projects?.name ?? c.category}
+                    </span>
+                    <span className={`flex-[1_1_176px] min-w-0 font-mono text-10.5 tracking-[0.04em] ${statusTone(group.key)}`}>
+                      {deadlineLine(c, group.key)}
+                    </span>
+                  </Link>
+                ))
+              : rows.map(({ c, no }) => {
+                  const { claimant, respondent } = partyLine(c);
+                  return (
+                    <Link
+                      key={c.id}
+                      to={`/cases/${c.id}`}
+                      className="no-underline text-ink flex flex-wrap cursor-pointer border-b border-hairline hover:bg-row-hover hover:text-ink"
+                    >
+                      <div className="flex-[0_0_24px] py-15 pl-24 font-mono text-10 text-muted-3">{no}</div>
+                      <div className="flex-[3_1_330px] min-w-0 py-14 pr-20 pl-12 flex flex-col gap-5">
+                        <div className="flex flex-wrap gap-x-12 gap-y-4 items-baseline">
+                          <span className="font-mono text-12 tracking-[0.04em]">{c.case_number}</span>
+                          <span className="text-15 font-semibold tracking-[-0.01em]">
+                            {c.projects?.name ?? c.category}
+                          </span>
+                        </div>
+                        <div className="text-13 text-ink-2">
+                          {claimant} <span className="text-muted-2">v.</span> {respondent}
+                        </div>
+                        <div className="font-mono text-10.5 tracking-[0.05em] text-muted">{disputeLine(c)}</div>
+                      </div>
+                      <div className="flex-[1_1_232px] min-w-0 py-14 pr-24 pl-18 border-l border-hairline flex flex-col gap-5">
+                        <span className={`font-mono text-11 tracking-[0.04em] ${statusTone(group.key)}`}>
+                          {deadlineLine(c, group.key)}
+                        </span>
+                        <span className="text-12.5 text-ink-2">{marginNote(c, group.key)}</span>
+                        <span className="font-mono text-10 tracking-[0.08em] text-muted-2">{arbitratorLabel(c)}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
           </div>
+        );
+      })}
 
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Contract (required if basis = arbitration clause)
-              <br />
-              <select name="contractId" defaultValue="">
-                <option value="">-- none --</option>
-                {selectedProject?.contracts?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.reference_number ?? c.id} {c.has_arbitration_clause ? '(has clause)' : '(no clause)'}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+      {filtered.length === 0 && <p className="px-24 py-20 text-13">No cases match this filter.</p>}
 
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Claimant
-              <br />
-              <select name="claimantId" required defaultValue="">
-                <option value="" disabled>
-                  -- select --
-                </option>
-                {parties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Respondent
-              <br />
-              <select name="respondentId" required defaultValue="">
-                <option value="" disabled>
-                  -- select --
-                </option>
-                {parties.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Dispute value
-              <br />
-              <input name="disputeValue" type="number" min="0" step="0.01" required />
-              &nbsp;
-              <select name="currency" defaultValue="KES">
-                <option value="KES">KES</option>
-                <option value="USD">USD</option>
-              </select>
-            </label>
-          </div>
-
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Category
-              <br />
-              <input name="category" required placeholder="e.g. payment, delay, defects" />
-            </label>
-          </div>
-
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Description
-              <br />
-              <textarea name="description" required rows={4} style={{ width: '100%' }} />
-            </label>
-          </div>
-
-          {error && (
-            <p role="alert" style={{ color: 'crimson' }}>
-              {error}
-            </p>
-          )}
-
-          <button type="submit" style={{ marginTop: '0.5rem' }}>
-            Create case
+      <div className="px-24 py-12 flex flex-wrap gap-x-16 gap-y-10 items-center text-12.5 text-ink-2">
+        <span className="font-mono text-10.5 tracking-[0.08em]">
+          SHOWING {filtered.length} OF {cases.length}
+        </span>
+        <span className="ml-auto flex gap-14">
+          <button type="button" disabled className="bg-transparent border-0 py-2 text-12.5 text-muted-3 cursor-not-allowed" aria-disabled="true">
+            Previous
           </button>
-        </form>
-      )}
-
-      <table style={{ marginTop: '1rem', borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Case #</th>
-            <th style={cellStyle}>Category</th>
-            <th style={cellStyle}>Value</th>
-            <th style={cellStyle}>Status</th>
-            <th style={cellStyle}>Due date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cases.map((c) => (
-            <tr key={c.id}>
-              <td style={cellStyle}>
-                <Link to={`/cases/${c.id}`}>{c.case_number}</Link>
-              </td>
-              <td style={cellStyle}>{c.category}</td>
-              <td style={cellStyle}>
-                {c.currency} {c.dispute_value}
-              </td>
-              <td style={cellStyle}>{c.status}</td>
-              <td style={cellStyle}>{c.due_date ? new Date(c.due_date).toLocaleDateString() : '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          <button
+            type="button"
+            className="bg-transparent border-0 py-2 text-12.5 border-b border-ink cursor-pointer hover:text-red hover:border-red"
+          >
+            Next
+          </button>
+        </span>
+      </div>
     </div>
   );
 }
-
-const cellStyle: CSSProperties = { border: '1px solid #ccc', padding: '0.4rem', textAlign: 'left' };

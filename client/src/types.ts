@@ -65,6 +65,15 @@ export interface AssignmentSummary {
   arbitrators: { id: string; full_name: string };
 }
 
+/** Shape returned by GET /arbitrators/:id - assignments joined to their case, not the arbitrator. */
+export interface ArbitratorAssignment {
+  id: string;
+  case_id: string;
+  status: string;
+  due_date: string;
+  cases: { id: string; case_number: string; status: string; outcome: string | null };
+}
+
 export interface Case {
   id: string;
   public_id: string;
@@ -106,9 +115,15 @@ export interface Arbitrator {
   arbitrator_qualifications?: { id: string; qualification: string }[];
   arbitrator_registrations?: { id: string; body: string; registration_number: string | null }[];
   arbitrator_conflicts?: { id: string; reason: string; expires_at: string | null }[];
-  assignments?: AssignmentSummary[];
+  /** Bare shape from GET /arbitrators (list) - use ArbitratorProfile for GET /arbitrators/:id. */
+  assignments?: Array<{ id: string; case_id: string; status: string; due_date: string }>;
   priorEngagementFlags?: Array<{ caseId: number; caseNumber: string; partyId: number }>;
 }
+
+/** GET /arbitrators/:id - the profile view, with assignments joined to their case. */
+export type ArbitratorProfile = Omit<Arbitrator, 'assignments'> & {
+  assignments: ArbitratorAssignment[];
+};
 
 export interface DocumentSummary {
   publicId: string;

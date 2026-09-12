@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Arbitrator } from '../types';
+import { Arbitrator, ArbitratorProfile } from '../types';
 
 export async function listArbitrators(): Promise<Arbitrator[]> {
   const { data } = await apiClient.get('/arbitrators');
@@ -11,7 +11,7 @@ export async function listEligibleArbitrators(caseId: string): Promise<Arbitrato
   return data;
 }
 
-export async function getArbitrator(arbitratorId: string): Promise<Arbitrator> {
+export async function getArbitrator(arbitratorId: string): Promise<ArbitratorProfile> {
   const { data } = await apiClient.get(`/arbitrators/${arbitratorId}`);
   return data;
 }

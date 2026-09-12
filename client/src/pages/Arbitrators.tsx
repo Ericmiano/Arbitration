@@ -1,10 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { createArbitrator, listArbitrators } from '../api/arbitrators';
 import { Arbitrator } from '../types';
 
 export function Arbitrators() {
-  const navigate = useNavigate();
   const [arbitrators, setArbitrators] = useState<Arbitrator[] | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,10 +118,10 @@ export function Arbitrators() {
         <p className="px-24 py-20 text-13">No arbitrators on the register yet.</p>
       ) : (
         arbitrators.map((a) => (
-          <div
+          <Link
             key={a.id}
-            onClick={() => navigate(`/arbitrators/${a.id}`)}
-            className="cursor-pointer border-b border-hairline px-24 py-14 hover:bg-row-hover flex flex-wrap gap-x-16 gap-y-4"
+            to={`/arbitrators/${a.id}`}
+            className="no-underline text-ink cursor-pointer border-b border-hairline px-24 py-14 hover:bg-row-hover hover:text-ink flex flex-wrap gap-x-16 gap-y-4"
           >
             <div className="flex-[2_1_260px] min-w-0">
               <div className="flex items-baseline gap-8">
@@ -145,7 +144,7 @@ export function Arbitrators() {
             <div className="flex-[2_1_220px] font-mono text-10.5 text-muted-2 tracking-[0.04em]">
               {a.arbitrator_specializations.map((s) => s.specialization).join(' · ')}
             </div>
-          </div>
+          </Link>
         ))
       )}
     </div>

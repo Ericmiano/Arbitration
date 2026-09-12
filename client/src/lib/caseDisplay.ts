@@ -108,6 +108,64 @@ export function disputeLine(c: Case): string {
   return `DISPUTE ${formatMoney(c.dispute_value, c.currency)}${location ? ` · ${location.toUpperCase()}` : ''}`;
 }
 
+export interface TimelineEvent {
+  date: string;
+  title: string;
+  meta: string;
+  tone: 'past' | 'overdue' | 'future';
+}
+
+/**
+ * A best-effort procedural history derived from the fields we actually have
+ * (filed, assigned, extensions aren't tracked in the Case payload, due date,
+ * concluded). Not the fully itemised submission-by-submission log the design
+ * mockup shows with invented case-specific events - we only surface what's
+ * real.
+ */
+export function buildTimeline(c: Case): TimelineEvent[] {
+  const events: TimelineEvent[] = [
+    { date: c.filed_at, title: 'Case filed', meta: `Case ${c.case_number} entered on the register`, tone: 'past' },
+  ];
+
+  const assignment = activeAssignment(c);
+  if (assignment) {
+    events.push({
+      date: assignment.due_date, // no separate "assigned_at" surfaced on AssignmentSummary yet
+      title: `Arbitrator appointed`,
+      meta: `${assignment.arbitrators.full_name}`,
+      tone: 'past',
+    });
+
+    const group = groupKeyForCase(c);
+    if (group === 'overdue') {
+      events.push({
+        date: assignment.due_date,
+        title: 'Became overdue',
+        meta: deadlineLine(c, group),
+        tone: 'overdue',
+      });
+    } else if (group === 'progress') {
+      events.push({
+        date: assignment.due_date,
+        title: 'Next date',
+        meta: `Due ${formatMonoDate(assignment.due_date)}`,
+        tone: 'future',
+      });
+    }
+  }
+
+  if (c.concluded_at) {
+    events.push({
+      date: c.concluded_at,
+      title: 'Case concluded',
+      meta: c.outcome ? c.outcome.replace(/_/g, ' ') : 'Outcome recorded',
+      tone: 'past',
+    });
+  }
+
+  return events;
+}
+
 export function partyLine(c: Case): { claimant: string; respondent: string } {
   const claimant = c.case_parties.find((p) => p.role === 'claimant')?.parties.full_name ?? 'Unnamed claimant';
   const respondent = c.case_parties.find((p) => p.role === 'respondent')?.parties.full_name ?? 'Unnamed respondent';
