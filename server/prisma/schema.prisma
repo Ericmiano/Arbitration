@@ -1,0 +1,26 @@
+// This schema intentionally has no models yet.
+//
+// schema.sql (repo root) is the source of truth for the database structure -
+// it's plain MySQL DDL so it can be imported directly via phpMyAdmin/mysql CLI
+// on cPanel, without needing Prisma Migrate's shadow-database privileges
+// (shared cPanel MySQL users usually can't grant those).
+//
+// Workflow:
+//   1. Apply schema.sql to the MySQL database (phpMyAdmin import, or `mysql < schema.sql`).
+//   2. Run `npm run prisma:pull`  (npx prisma db pull) to introspect the live DB and
+//      generate models here automatically, matching schema.sql exactly.
+//   3. Run `npm run prisma:generate` to (re)build the type-safe client.
+// Re-run steps 2-3 whenever schema.sql changes.
+
+generator client {
+  provider = "prisma-client-js"
+  // Prisma's query engine is a compiled native binary. If deployment to the
+  // cPanel host fails with an "engine not found for platform" error, add the
+  // host's platform identifier here (ask the host, or run `npx prisma -v` on
+  // the server) - e.g. binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
