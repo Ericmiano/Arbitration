@@ -25,3 +25,7 @@ export async function fetchCurrentUser(): Promise<SessionUser | null> {
 export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   await apiClient.post('/auth/change-password', { currentPassword, newPassword });
 }
+
+export async function updateProfile(fullName: string): Promise<void> {
+  await apiClient.patch('/auth/profile', { fullName });
+}

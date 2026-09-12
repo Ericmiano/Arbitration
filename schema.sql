@@ -20,6 +20,9 @@ CREATE TABLE users (
     public_id           CHAR(36) NOT NULL DEFAULT (UUID()),
     email               VARCHAR(255) NOT NULL,
     password_hash       VARCHAR(255) NOT NULL,
+    full_name           VARCHAR(255) NULL,          -- display name for staff/admin/registrar accounts;
+                                                      -- arbitrator/party accounts display arbitrators.full_name /
+                                                      -- parties.full_name instead (see auth.routes.ts)
     role                ENUM('admin', 'registrar', 'staff', 'arbitrator', 'party') NOT NULL,
     status              ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
     mfa_secret          VARCHAR(255) NULL,
@@ -66,27 +69,69 @@ CREATE INDEX idx_parties_org ON parties(organization_id);
 -- ARBITRATORS
 -- ============================================================
 
+-- Field set below matches AAK's actual arbitrator profile records (as held
+-- outside this system) rather than a generic guess: AAK membership number,
+-- current position/organization, AAK professional chapter, years of
+-- practice and a professional-contact phone number all come directly from
+-- how AAK already describes its arbitrators.
 CREATE TABLE arbitrators (
-    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id             BIGINT UNSIGNED NOT NULL,
-    full_name           VARCHAR(255) NOT NULL,
-    credentials         TEXT NULL,                          -- qualifications, bar admissions, etc.
-    status              ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
-    score               DECIMAL(5,2) NOT NULL DEFAULT 70.00, -- neutral baseline until enough history exists
-    cases_closed_count  INT UNSIGNED NOT NULL DEFAULT 0,     -- gates when score formula fully kicks in (see app logic)
-    score_updated_at    DATETIME NULL,
-    joined_at           DATE NOT NULL,
-    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id               BIGINT UNSIGNED NOT NULL,
+    full_name             VARCHAR(255) NOT NULL,
+    aak_membership_no     VARCHAR(50) NULL,                    -- e.g. "4336", "FAAK 1890"
+    current_position      VARCHAR(255) NULL,                   -- e.g. "Managing Partner"
+    current_organization  VARCHAR(255) NULL,                   -- e.g. "S S Malonza Advocates LLP"
+    aak_chapter           VARCHAR(150) NULL,                   -- e.g. "Quantity Surveyors Chapter"
+    years_of_practice     SMALLINT UNSIGNED NULL,
+    phone                 VARCHAR(50) NULL,                    -- professional contact number, distinct from login email
+    bio                   TEXT NULL,                           -- "Professional Profile" narrative
+    adr_experience_notes  TEXT NULL,                           -- "ADR Experience & Training", one item per line
+    status                ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
+    score                 DECIMAL(5,2) NOT NULL DEFAULT 70.00, -- neutral baseline until enough history exists
+    cases_closed_count    INT UNSIGNED NOT NULL DEFAULT 0,     -- gates when score formula fully kicks in (see app logic)
+    score_updated_at      DATETIME NULL,
+    joined_at             DATE NOT NULL,
+    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_arbitrators_user (user_id),
     CONSTRAINT fk_arbitrators_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- Areas of expertise: both ADR service types (arbitration, adjudication,
+-- mediation, early neutral evaluation) and sector/practice tags (e.g.
+-- "construction", "commercial") - AAK profiles mix both under one heading,
+-- and a free-text tag list handles that without forcing a false split.
 CREATE TABLE arbitrator_specializations (
     arbitrator_id       BIGINT UNSIGNED NOT NULL,
-    specialization      VARCHAR(150) NOT NULL,               -- e.g. 'construction', 'employment', 'commercial'
+    specialization      VARCHAR(150) NOT NULL,
     PRIMARY KEY (arbitrator_id, specialization),
     CONSTRAINT fk_spec_arbitrator FOREIGN KEY (arbitrator_id) REFERENCES arbitrators(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
+
+-- One row per professional body an arbitrator belongs to/is registered with
+-- (AAK profiles list this under both "Professional Registration" and
+-- "Professional Memberships" - normalized here into a single list rather
+-- than replicating that redundancy).
+CREATE TABLE arbitrator_registrations (
+    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    arbitrator_id         BIGINT UNSIGNED NOT NULL,
+    body                  VARCHAR(150) NOT NULL,                -- e.g. "BORAQS", "CIArb", "LSK", "NCIA"
+    registration_number   VARCHAR(100) NULL,
+    CONSTRAINT fk_arb_reg_arbitrator FOREIGN KEY (arbitrator_id) REFERENCES arbitrators(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_arb_reg_arbitrator ON arbitrator_registrations(arbitrator_id);
+
+-- One row per academic qualification (degree, institution, year range as
+-- free text - source records format this inconsistently enough that forcing
+-- separate degree/institution/year columns would lose information).
+CREATE TABLE arbitrator_qualifications (
+    id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    arbitrator_id         BIGINT UNSIGNED NOT NULL,
+    qualification         VARCHAR(500) NOT NULL,
+    CONSTRAINT fk_arb_qual_arbitrator FOREIGN KEY (arbitrator_id) REFERENCES arbitrators(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_arb_qual_arbitrator ON arbitrator_qualifications(arbitrator_id);
 
 -- Declared/known conflicts of interest, checked before assignment.
 CREATE TABLE arbitrator_conflicts (

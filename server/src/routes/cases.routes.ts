@@ -18,7 +18,7 @@ const caseSummaryInclude: Prisma.casesInclude = {
     where: { status: { in: ['ongoing', 'overdue', 'escalated'] } },
     include: { arbitrators: { select: { id: true, full_name: true } } },
   },
-  projects: { select: { id: true, name: true } },
+  projects: { select: { id: true, name: true, location: true } },
 };
 
 /** Cases visible to the current session user, scoped by role. */

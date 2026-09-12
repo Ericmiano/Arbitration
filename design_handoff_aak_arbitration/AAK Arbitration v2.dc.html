@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; background: #E8E3D9; color: #17150E; font-family: "IBM Plex Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+  a { color: #A5121C; text-decoration: none; }
+  a:hover { color: #7C0D14; text-decoration: underline; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid #A5121C; outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; display: grid; grid-template-columns: minmax(0, 226px) minmax(0, 1fr);">
+
+  <nav aria-label="Main" style="background: #1C1A15; color: #C6BFB1; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh;">
+    <div style="padding: 20px 18px 16px; border-bottom: 1px solid #302C24;">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; font-weight: 600; letter-spacing: 0.16em; color: #F5F1E8;">A<span style="color: #A5121C;">A</span>K</div>
+      <div style="margin-top: 5px; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.14em; color: #857E71;">ARBITRATION REGISTER</div>
+    </div>
+
+    <div style="padding: 14px 0 4px;">
+      <sc-for list="{{ navPrimary }}" as="n" hint-placeholder-count="6">
+        <a href="{{ n.href }}" onClick="{{ n.onClick }}" aria-current="{{ n.current }}" style="{{ n.style }}" style-hover="color: #F5F1E8;">
+          <span style="width: 2px; align-self: stretch; background: {{ n.bar }};"></span>
+          <span style="flex: 1 1 auto;">{{ n.label }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: {{ n.countColor }};">{{ n.count }}</span>
+        </a>
+      </sc-for>
+    </div>
+
+    <div style="margin-top: 12px; padding: 12px 0 4px; border-top: 1px solid #302C24;">
+      <sc-for list="{{ navSecondary }}" as="n" hint-placeholder-count="3">
+        <a href="{{ n.href }}" onClick="{{ n.onClick }}" style="{{ n.style }}" style-hover="color: #F5F1E8;">
+          <span style="width: 2px; align-self: stretch; background: {{ n.bar }};"></span>
+          <span style="flex: 1 1 auto;">{{ n.label }}</span>
+        </a>
+      </sc-for>
+    </div>
+
+    <div style="margin-top: auto; padding: 15px 18px; border-top: 1px solid #302C24;">
+      <div style="font-size: 12.5px; color: #F5F1E8;">Grace Wanjiru</div>
+      <div style="margin-top: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.1em; color: #857E71;">ADMINISTRATOR · NAIROBI</div>
+    </div>
+  </nav>
+
+  <main style="min-width: 0;">
+    <div style="background: #FBF8F1; border-bottom: 1px solid #17150E; padding: 0 26px; min-height: 54px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; position: sticky; top: 0; z-index: 5;">
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.13em; color: #6B6455;">{{ crumb }}</span>
+      <label style="margin-left: auto; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #CFC8BA; height: 30px; width: 250px; max-width: 40vw;">
+        <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: #8A8373;">FIND</span>
+        <input type="text" placeholder="{{ searchPlaceholder }}" style="border: 0; background: transparent; outline: none; font-size: 13px; width: 100%; color: #17150E;">
+      </label>
+      <button onClick="{{ goNotifications }}" style="height: 30px; padding: 0 4px; background: transparent; border: 0; border-bottom: 1px solid transparent; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; gap: 7px;" style-hover="border-bottom-color: #17150E;">
+        <span>Notifications</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #A5121C;">4</span>
+      </button>
+      <button onClick="{{ goNewCase }}" style="min-height: 31px; padding: 6px 14px; background: #A5121C; border: 0; color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;" style-hover="background: #7C0D14;">Start new arbitration</button>
+    </div>
+
+    <div style="padding: 22px 26px 60px;">
+
+      <sc-if value="{{ isDocket }}" hint-placeholder-val="{{ true }}">
+        <div style="background: #FBF8F1; border: 1px solid #17150E;">
+
+          <div style="padding: 22px 24px 18px; display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: flex-end; border-bottom: 1px solid #17150E;">
+            <div style="flex: 1 1 300px; min-width: 0;">
+              <h1 style="margin: 0; font-size: 27px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.1;">{{ sheetTitle }}</h1>
+              <div style="margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em; color: #6B6455;">{{ sheetStamp }}</div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 22px;">
+              <sc-for list="{{ tally }}" as="t" hint-placeholder-count="4">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 19px; font-weight: 500; color: {{ t.tone }}; line-height: 1;">{{ t.value }}</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.1em; color: #6B6455;">{{ t.label }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{ showFilters }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-wrap: wrap; border-bottom: 1px solid #CFC8BA; background: #F4EFE5;">
+              <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5">
+                <button onClick="{{ f.onClick }}" style="{{ f.style }}">{{ f.label }} <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #6B6455;">{{ f.count }}</span></button>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-for list="{{ groups }}" as="g" hint-placeholder-count="4">
+            <div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; padding: 9px 24px; background: #F0EADE; border-bottom: 1px solid #CFC8BA;">
+                <span style="width: 7px; height: 7px; background: {{ g.tone }};"></span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.13em; color: {{ g.tone }};">{{ g.label }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: #6B6455;">{{ g.count }}</span>
+                <span style="font-size: 12px; color: #5A544A;">{{ g.note }}</span>
+              </div>
+
+              <sc-for list="{{ g.denseRows }}" as="c" hint-placeholder-count="0">
+                <div onClick="{{ c.onOpen }}" style="display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; cursor: pointer; padding: 10px 24px; border-bottom: 1px solid #E2DBCD;" style-hover="background: #F7F2E8;">
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.04em; flex: 0 0 106px;">{{ c.ref }}</span>
+                  <span style="flex: 2 1 220px; min-width: 0; font-size: 13.5px; font-weight: 500;">{{ c.project }}</span>
+                  <span style="flex: 1 1 176px; min-width: 0; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.04em; color: {{ c.statusTone }};">{{ c.deadline }}</span>
+                </div>
+              </sc-for>
+
+              <sc-for list="{{ g.fullRows }}" as="c" hint-placeholder-count="3">
+                <div onClick="{{ c.onOpen }}" style="display: flex; flex-wrap: wrap; cursor: pointer; border-bottom: 1px solid #E2DBCD;" style-hover="background: #F7F2E8;">
+                  <div style="flex: 0 0 24px; padding: 15px 0 15px 24px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #A89F8E;">{{ c.no }}</div>
+                  <div style="flex: 3 1 330px; min-width: 0; padding: 14px 20px 14px 12px; display: flex; flex-direction: column; gap: 5px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline;">
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.04em; color: #17150E;">{{ c.ref }}</span>
+                      <span style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em;">{{ c.project }}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #3C382F;">{{ c.claimant }} <span style="color: #8A8373;">v.</span> {{ c.respondent }}</div>
+                    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.05em; color: #6B6455;">{{ c.line }}</div>
+                  </div>
+                  <div style="flex: 1 1 232px; min-width: 0; padding: 14px 24px 14px 18px; border-left: 1px solid #E2DBCD; display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.04em; color: {{ c.statusTone }};">{{ c.deadline }}</span>
+                    <span style="font-size: 12.5px; color: #3C382F;">{{ c.margin }}</span>
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: #8A8373;">{{ c.arbitrator }}</span>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+
+          <div style="padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; font-size: 12.5px; color: #5A544A;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.08em;">{{ pageStamp }}</span>
+            <span style="margin-left: auto; display: flex; gap: 14px;">
+              <button style="background: transparent; border: 0; padding: 2px 0; font-size: 12.5px; color: #A89F8E; cursor: not-allowed;">Previous</button>
+              <button style="background: transparent; border: 0; padding: 2px 0; font-size: 12.5px; border-bottom: 1px solid #17150E; cursor: pointer;" style-hover="color: #A5121C; border-bottom-color: #A5121C;">Next</button>
+            </span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isCase }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FBF8F1; border: 1px solid #17150E;">
+
+          <div style="padding: 22px 24px 18px; border-bottom: 1px solid #17150E; display: flex; flex-wrap: wrap; gap: 18px 24px; align-items: flex-start; justify-content: space-between;">
+            <div style="flex: 1 1 340px; min-width: 0;">
+              <div style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; letter-spacing: 0.12em; color: #6B6455;">ARB-2026-014 · FILED 04 JUNE 2026</div>
+              <h1 style="margin: 9px 0 0; font-size: 26px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.2;">ABC Construction Ltd<br><span style="font-weight: 400; font-size: 17px; color: #6B6455;">v.</span> XYZ Consultants</h1>
+              <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.08em; color: #A5121C;">
+                <span style="width: 7px; height: 7px; background: #A5121C;"></span>EVIDENCE REVIEW OVERDUE 12 DAYS · DAY 92 OF 120
+              </div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <button style="min-height: 31px; padding: 6px 12px; background: transparent; border: 1px solid #17150E; font-size: 12.5px; cursor: pointer; white-space: nowrap;" style-hover="background: #F0EADE;">Upload document</button>
+              <button style="min-height: 31px; padding: 6px 12px; background: transparent; border: 1px solid #17150E; font-size: 12.5px; cursor: pointer; white-space: nowrap;" style-hover="background: #F0EADE;">Schedule hearing</button>
+              <button style="min-height: 31px; padding: 6px 14px; background: #A5121C; border: 1px solid #A5121C; color: #fff; font-size: 12.5px; font-weight: 500; cursor: pointer; white-space: nowrap;" style-hover="background: #7C0D14;">Record outcome</button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; border-bottom: 1px solid #CFC8BA; background: #F4EFE5;">
+            <sc-for list="{{ caseTabs }}" as="t" hint-placeholder-count="7">
+              <button onClick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</button>
+            </sc-for>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap;">
+            <div style="flex: 3 1 420px; min-width: 0;">
+
+              <div style="display: flex; flex-wrap: wrap; border-bottom: 1px solid #CFC8BA;">
+                <sc-for list="{{ titleblock }}" as="f" hint-placeholder-count="8">
+                  <div style="flex: 1 1 172px; min-width: 0; padding: 13px 18px; border-right: 1px solid #E2DBCD; border-bottom: 1px solid #E2DBCD; margin-bottom: -1px; display: flex; flex-direction: column; gap: 5px;">
+                    <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.11em; color: #6B6455;">{{ f.label }}</span>
+                    <span style="font-family: {{ f.face }}; font-size: 14px; font-weight: 500; color: {{ f.tone }};">{{ f.value }}</span>
+                    <span style="font-size: 11.5px; color: #6B6455;">{{ f.note }}</span>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="padding: 15px 20px 14px; border-bottom: 1px solid #CFC8BA;">
+                <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: #6B6455;">ARBITRATOR</div>
+                <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: baseline;">
+                  <span style="font-size: 16px; font-weight: 600;">Jane Doe</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.07em; color: #2F6B4F;">■ NO DECLARED CONFLICTS · VERIFIED 10 JUN 2026</span>
+                  <button onClick="{{ goArbitrators }}" style="margin-left: auto; background: transparent; border: 0; border-bottom: 1px solid #17150E; padding: 2px 0; font-size: 12.5px; cursor: pointer;" style-hover="color: #A5121C; border-bottom-color: #A5121C;">Open profile</button>
+                </div>
+                <div style="margin-top: 9px; display: flex; flex-wrap: wrap; gap: 18px;">
+                  <sc-for list="{{ arbStats }}" as="s" hint-placeholder-count="4">
+                    <span style="display: flex; flex-direction: column; gap: 3px;">
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: 500;">{{ s.value }}</span>
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.09em; color: #6B6455;">{{ s.label }}</span>
+                    </span>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="padding: 15px 20px 6px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline;">
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: #6B6455;">CASE FILE</span>
+                  <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #8A8373;">11 DOCUMENTS</span>
+                </div>
+                <div style="margin-top: 10px;">
+                  <sc-for list="{{ caseDocuments }}" as="d" hint-placeholder-count="4">
+                    <div style="padding: 11px 0; border-top: 1px solid #E2DBCD; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline;">
+                      <span style="flex: 1 1 250px; min-width: 0; font-size: 13.5px; font-weight: 500;">{{ d.name }}</span>
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.09em; color: #6B6455; flex: 0 0 104px;">{{ d.category }}</span>
+                      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.09em; color: {{ d.accessTone }}; flex: 0 0 132px;">{{ d.access }}</span>
+                      <span style="flex: 1 1 100%; font-size: 12px; color: #6B6455;">{{ d.meta }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+
+            <aside style="flex: 1 1 258px; min-width: 0; border-left: 1px solid #CFC8BA; background: #F9F5EC;">
+              <div style="padding: 13px 18px; border-bottom: 1px solid #CFC8BA; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: #6B6455;">PROCEDURAL HISTORY</div>
+              <div style="padding: 15px 18px 18px;">
+                <sc-for list="{{ timeline }}" as="e" hint-placeholder-count="7">
+                  <div style="display: flex; gap: 10px;">
+                    <span style="flex: 0 0 62px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.04em; color: #6B6455; padding-top: 2px;">{{ e.date }}</span>
+                    <span style="flex: 0 0 7px; display: flex; flex-direction: column; align-items: center;">
+                      <span style="width: 7px; height: 7px; margin-top: 5px; background: {{ e.tone }};"></span>
+                      <span style="width: 1px; flex: 1; min-height: 22px; background: #CFC8BA;"></span>
+                    </span>
+                    <span style="flex: 1 1 auto; min-width: 0; padding-bottom: 15px;">
+                      <span style="display: block; font-size: 13px; font-weight: 500; color: {{ e.textTone }};">{{ e.title }}</span>
+                      <span style="display: block; margin-top: 3px; font-size: 11.5px; color: #6B6455;">{{ e.meta }}</span>
+                    </span>
+                  </div>
+                </sc-for>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isStub }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FBF8F1; border: 1px solid #17150E; padding: 34px 24px; max-width: 640px;">
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.12em; color: #6B6455;">NOT IN THIS PASS</div>
+          <h1 style="margin: 10px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;">{{ stubTitle }}</h1>
+          <p style="margin: 10px 0 0; font-size: 13.5px; line-height: 1.6; color: #3C382F;">{{ stubBody }}</p>
+          <button onClick="{{ goHome }}" style="margin-top: 16px; background: transparent; border: 0; border-bottom: 1px solid #17150E; padding: 2px 0; font-size: 12.5px; cursor: pointer;" style-hover="color: #A5121C; border-bottom-color: #A5121C;">Back to the docket</button>
+        </div>
+      </sc-if>
+
+      <p style="margin: 14px 0 0; font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; letter-spacing: 0.11em; color: #8A8373;">SAMPLE DATA — DESIGN CONCEPT, NOT LIVE CASE RECORDS</p>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1440,&quot;height&quot;:1000}}">
+const RED = "#A5121C", GREEN = "#2F6B4F", AMBER = "#8A5A12", INK = "#17150E", MUTED = "#6B6455", MONO = "'IBM Plex Mono', monospace", SANS = "'IBM Plex Sans', sans-serif";
+
+const NAV_PRIMARY = [
+  { id: "docket", label: "Docket", count: "" },
+  { id: "cases", label: "Cases", count: "24" },
+  { id: "arbitrators", label: "Arbitrators", count: "8" },
+  { id: "documents", label: "Documents", count: "91" },
+  { id: "hearings", label: "Hearings", count: "6" },
+  { id: "reports", label: "Reports", count: "" }
+];
+const NAV_SECONDARY = [{ id: "users", label: "Users" }, { id: "settings", label: "Settings" }];
+
+const STUBS = {
+  arbitrators: ["Arbitrator directory", "Each arbitrator with active caseload, overdue assignments, availability and conflict status, opening into a full profile with assignment history."],
+  documents: ["Document register", "The full case file across all arbitrations: filename, category, version, uploader, date, and who is authorised to see each document."],
+  hearings: ["Hearing schedule", "The agenda by date: case, parties, venue or meeting link, and the papers required beforehand."],
+  reports: ["Reports", "Case volume, average duration, overdue arbitrations and arbitrator workload."],
+  users: ["Users and permissions", "AAK staff, arbitrators and party accounts, and the access each role holds."],
+  settings: ["Settings", "Grouped into account, security, notifications, permissions and system configuration."],
+  notifications: ["Notifications", "Operational alerts only: action required, deadline approaching, hearing scheduled, document awaiting review, conflict to resolve."],
+  newcase: ["Start a new arbitration", "A seven-step workflow — parties, project, dispute, contract, documents, review, submit — with drafts saved between steps."]
+};
+
+const CASES = [
+  { ref: "ARB-2026-014", project: "Nairobi Commercial Development", claimant: "ABC Construction Ltd", respondent: "XYZ Consultants", arbitrator: "JANE DOE", line: "DISPUTE KES 37,500,000 · UPPER HILL, NAIROBI", deadline: "DUE 18 SEP · 12 DAYS OVERDUE", margin: "Evidence review not closed. Arbitrator last responded 03 August.", group: "overdue" },
+  { ref: "ARB-2026-009", project: "Naivasha Resort Extension", claimant: "Rift Hospitality", respondent: "Acacia Structures", arbitrator: "JOHN SMITH", line: "DISPUTE KES 6,750,000 · NAIVASHA", deadline: "DUE 12 SEP · 4 DAYS OVERDUE", margin: "Award drafted but not recorded. Day 118 of 120.", group: "overdue" },
+  { ref: "ARB-2026-011", project: "Thika Industrial Warehouse", claimant: "Riverside Logistics", respondent: "Mwangi & Partners", arbitrator: "NOT APPOINTED", line: "DISPUTE KES 21,000,000 · THIKA", deadline: "APPOINT BY 20 SEP", margin: "Filed 9 days ago. Two candidates cleared for conflicts.", group: "appoint" },
+  { ref: "ARB-2026-013", project: "Mombasa Road Retail Park", claimant: "Coastline Developers", respondent: "Kilifi Build Group", arbitrator: "MARY KAMAU", line: "DISPUTE KES 12,900,000 · MOMBASA ROAD", deadline: "HEARING 21 SEP, 10:00", margin: "First hearing at the AAK Centre. Both parties confirmed.", group: "progress" },
+  { ref: "ARB-2026-012", project: "Kisumu Lakeside Housing", claimant: "Lakeview Estates", respondent: "Nyanza Contractors", arbitrator: "JOHN SMITH", line: "DISPUTE KES 8,400,000 · KISUMU", deadline: "SUBMISSIONS DUE 02 OCT", margin: "Respondent has the running reply. Day 48 of 120.", group: "progress" },
+  { ref: "ARB-2026-010", project: "Eldoret Civic Centre", claimant: "Uasin Gishu County", respondent: "Highland Builders", arbitrator: "MARY KAMAU", line: "DISPUTE KES 45,200,000 · ELDORET", deadline: "AWARD DUE 30 SEP", margin: "Award drafted 06 September, in review with the parties.", group: "progress" },
+  { ref: "ARB-2026-008", project: "Nakuru Mixed-Use Block", claimant: "Menengai Property", respondent: "Summit Engineering", arbitrator: "JANE DOE", line: "DISPUTE KES 15,300,000 · NAKURU", deadline: "CLOSED 04 AUG · 77 DAYS", margin: "Award issued in favour of the claimant in part. Costs apportioned.", group: "closed" },
+  { ref: "ARB-2026-007", project: "Machakos School Campus", claimant: "Board of Governors", respondent: "Kyeni Works Ltd", arbitrator: "MARY KAMAU", line: "DISPUTE KES 3,100,000 · MACHAKOS", deadline: "CLOSED 22 JUL · 69 DAYS", margin: "Settled by agreement before the second hearing.", group: "closed" }
+];
+
+const GROUP_DEFS = [
+  { key: "overdue", label: "OVERDUE", tone: RED, note: "Past the agreed date. Act today." },
+  { key: "appoint", label: "AWAITING APPOINTMENT", tone: AMBER, note: "No arbitrator on record." },
+  { key: "progress", label: "IN PROGRESS", tone: "#3C382F", note: "Nothing required from AAK today." },
+  { key: "closed", label: "CONCLUDED", tone: "#8A8373", note: "Retained for the register." }
+];
+
+class Component extends DCLogic {
+  state = { view: "docket", tab: "Overview", filter: "All" };
+
+  nav(view) { this.setState({ view }); window.scrollTo(0, 0); }
+
+  navItem(n) {
+    const active = this.state.view === n.id || (n.id === "cases" && this.state.view === "case");
+    return {
+      ...n,
+      href: "#" + n.id,
+      current: active ? "page" : undefined,
+      bar: active ? RED : "transparent",
+      countColor: active ? "#A79F90" : "#7A7466",
+      onClick: (e) => { e.preventDefault(); this.nav(n.id); },
+      style: {
+        display: "flex", alignItems: "center", gap: "12px", padding: "8px 18px 8px 0",
+        fontSize: "13.5px", textDecoration: "none", minHeight: "34px",
+        color: active ? "#F5F1E8" : "#C6BFB1",
+        background: active ? "#26231C" : "transparent"
+      }
+    };
+  }
+
+  renderVals() {
+    const v = this.state.view;
+    const stub = STUBS[v];
+    const openCase = () => this.setState({ view: "case", tab: "Overview" });
+    const isCases = v === "cases";
+
+    const rows = CASES.map((c, i) => ({
+      ...c,
+      no: String(i + 1).padStart(2, "0"),
+      statusTone: c.group === "overdue" ? RED : c.group === "appoint" ? AMBER : c.group === "closed" ? "#8A8373" : "#3C382F",
+      onOpen: openCase
+    }));
+    const shown = isCases ? rows : rows.filter((r) => r.group !== "closed");
+
+    return {
+      navPrimary: NAV_PRIMARY.map((n) => this.navItem(n)),
+      navSecondary: NAV_SECONDARY.map((n) => this.navItem(n)),
+      isDocket: v === "docket" || isCases,
+      isCase: v === "case",
+      isStub: !!stub,
+      stubTitle: stub ? stub[0] : "",
+      stubBody: stub ? stub[1] : "",
+      crumb: v === "case" ? "DOCKET / ARB-2026-014" : isCases ? "DOCKET / ALL CASES" : stub ? "AAK / " + stub[0].toUpperCase() : "AAK / DOCKET",
+      searchPlaceholder: "Case number, party or project",
+      goHome: () => this.nav("docket"),
+      goArbitrators: () => this.nav("arbitrators"),
+      goNotifications: () => this.nav("notifications"),
+      goNewCase: () => this.nav("newcase"),
+
+      sheetTitle: isCases ? "All cases" : "Docket",
+      sheetStamp: isCases ? "24 ARBITRATIONS ON THE REGISTER · UPDATED 12 SEP 2026, 08:40" : "SATURDAY 12 SEPTEMBER 2026 · GRACE WANJIRU · AAK ADMINISTRATOR",
+      pageStamp: isCases ? "SHOWING 1–8 OF 24" : "TWO MATTERS NEED ACTION TODAY · FULL REGISTER UNDER CASES",
+
+      tally: [
+        { value: "2", label: "OVERDUE", tone: RED },
+        { value: "1", label: "TO APPOINT", tone: AMBER },
+        { value: "24", label: "ACTIVE", tone: INK }
+      ],
+
+      showFilters: isCases,
+      filters: ["All", "Overdue", "Awaiting appointment", "In progress", "Concluded"].map((label, i) => {
+        const counts = ["24", "2", "1", "12", "9"];
+        const active = this.state.filter === label;
+        return {
+          label, count: counts[i],
+          onClick: () => this.setState({ filter: label }),
+          style: {
+            display: "flex", alignItems: "center", gap: "7px", padding: "9px 16px", whiteSpace: "nowrap",
+            background: active ? "#FBF8F1" : "transparent", border: "0", cursor: "pointer",
+            fontSize: "12.5px", color: active ? INK : "#5A544A", whiteSpace: "nowrap",
+            fontWeight: active ? 600 : 400,
+            boxShadow: active ? "inset 0 -2px 0 " + RED : "none"
+          }
+        };
+      }),
+
+      groups: GROUP_DEFS.map((g) => {
+        const gr = shown.filter((r) => r.group === g.key);
+        const dense = g.key === "progress" || g.key === "closed";
+        return {
+          ...g,
+          count: String(gr.length).padStart(2, "0"),
+          rows: gr,
+          fullRows: dense ? [] : gr,
+          denseRows: dense ? gr : []
+        };
+      }).filter((g) => g.rows.length),
+
+      caseTabs: ["Overview", "Parties", "Project", "Arbitrator", "Documents", "Hearings", "Activity"].map((label) => {
+        const active = this.state.tab === label;
+        return {
+          label,
+          onClick: () => this.setState({ tab: label }),
+          style: {
+            padding: "10px 16px", background: active ? "#FBF8F1" : "transparent", border: "0",
+            cursor: "pointer", fontSize: "12.5px", color: active ? INK : "#5A544A",
+            fontWeight: active ? 600 : 400,
+            boxShadow: active ? "inset 0 -2px 0 " + RED : "none"
+          }
+        };
+      }),
+
+      titleblock: [
+        { label: "PROJECT", value: "Nairobi Commercial Development", note: "Mixed-use, 14 storeys, Upper Hill", face: SANS, tone: INK },
+        { label: "PROJECT VALUE", value: "KES 480,000,000", note: "Contract sum at award", face: MONO, tone: INK },
+        { label: "DISPUTE VALUE", value: "KES 37,500,000", note: "Variations and delay", face: MONO, tone: INK },
+        { label: "CLAIMANT", value: "ABC Construction Ltd", note: "Otieno Advocates", face: SANS, tone: INK },
+        { label: "RESPONDENT", value: "XYZ Consultants", note: "Mutiso & Co.", face: SANS, tone: INK },
+        { label: "ARBITRATION CLAUSE", value: "Clause 34.2", note: "JBC Agreement, 2019 edition", face: MONO, tone: INK },
+        { label: "APPOINTED", value: "12 June 2026", note: "By AAK on party request", face: SANS, tone: INK },
+        { label: "NEXT DATE", value: "18 September 2026", note: "Evidence review, 12 days overdue", face: SANS, tone: RED }
+      ],
+
+      arbStats: [
+        { value: "1", label: "ACTIVE CASES" },
+        { value: "94%", label: "ON TIME" },
+        { value: "78d", label: "AVERAGE DURATION" },
+        { value: "8", label: "SIMILAR MATTERS" }
+      ],
+
+      caseDocuments: [
+        { name: "Statement of claim", category: "SUBMISSION", access: "PARTY-VISIBLE", accessTone: MUTED, meta: "ABC Construction Ltd · 18 Jun 2026 · PDF 2.4 MB · v1" },
+        { name: "Response to claim", category: "RESPONSE", access: "PARTY-VISIBLE", accessTone: MUTED, meta: "XYZ Consultants · 25 Jun 2026 · PDF 1.8 MB · v1" },
+        { name: "Bill of quantities, revision 3", category: "EVIDENCE", access: "PARTY-VISIBLE", accessTone: MUTED, meta: "ABC Construction Ltd · 09 Sep 2026 · PDF 5.1 MB · v3" },
+        { name: "Arbitrator working notes", category: "CORRESPONDENCE", access: "ARBITRATOR-ONLY", accessTone: RED, meta: "Jane Doe · 03 Aug 2026 · PDF 640 KB · v1" }
+      ],
+
+      timeline: [
+        { date: "12 JUN", title: "Arbitrator appointed", meta: "Jane Doe, appointed by AAK under clause 34.2", tone: "#B3AB99", textTone: INK },
+        { date: "18 JUN", title: "Claimant documents submitted", meta: "Statement of claim and four annexes", tone: "#B3AB99", textTone: INK },
+        { date: "25 JUN", title: "Respondent response received", meta: "Filed within time", tone: "#B3AB99", textTone: INK },
+        { date: "14 JUL", title: "First hearing held", meta: "AAK Centre, Nairobi, both parties present", tone: "#B3AB99", textTone: INK },
+        { date: "03 AUG", title: "Additional evidence submitted", meta: "Revised bill of quantities", tone: "#B3AB99", textTone: INK },
+        { date: "06 SEP", title: "Evidence review became overdue", meta: "12 days past the agreed date", tone: RED, textTone: RED },
+        { date: "21 SEP", title: "Next hearing", meta: "Scheduled, 14:00, virtual", tone: GREEN, textTone: GREEN }
+      ]
+    };
+  }
+}
+
+</script>
+</body>
+</html>

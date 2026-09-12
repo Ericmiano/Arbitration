@@ -3,6 +3,8 @@ export type Role = 'admin' | 'registrar' | 'staff' | 'arbitrator' | 'party';
 export interface SessionUser {
   id: number;
   role: Role;
+  fullName: string;
+  email: string;
 }
 
 export interface Party {
@@ -82,17 +84,29 @@ export interface Case {
   award_challenged: boolean | null;
   case_parties: CaseParty[];
   assignments: AssignmentSummary[];
-  projects: { id: string; name: string } | null;
+  projects: { id: string; name: string; location: string | null } | null;
 }
 
 export interface Arbitrator {
   id: string;
   user_id: string;
   full_name: string;
+  aak_membership_no: string | null;
+  current_position: string | null;
+  current_organization: string | null;
+  aak_chapter: string | null;
+  years_of_practice: number | null;
+  phone: string | null;
+  bio: string | null;
+  adr_experience_notes: string | null;
   status: 'active' | 'inactive' | 'suspended';
   score: string;
   cases_closed_count: number;
   arbitrator_specializations: { specialization: string }[];
+  arbitrator_qualifications?: { id: string; qualification: string }[];
+  arbitrator_registrations?: { id: string; body: string; registration_number: string | null }[];
+  arbitrator_conflicts?: { id: string; reason: string; expires_at: string | null }[];
+  assignments?: AssignmentSummary[];
   priorEngagementFlags?: Array<{ caseId: number; caseNumber: string; partyId: number }>;
 }
 

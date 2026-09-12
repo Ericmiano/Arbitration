@@ -1,19 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design system: AAK Arbitration ("ledger" design, see
+  design_handoff_aak_arbitration/README.md for the full brief). Warm-paper,
+  ink-on-stone, no shadows, radius 0, monospace for references/money/dates,
+  sans for names/prose. Colour tokens live in tailwind.config.js.
+*/
+
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color-scheme: light;
 }
 
 body {
   margin: 0;
+  background: #e8e3d9; /* app-bg */
+  color: #17150e; /* ink */
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
-nav {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  border-bottom: 1px solid #ccc;
+a {
+  color: #a5121c;
+  text-decoration: none;
+}
+a:hover {
+  color: #7c0d14;
+  text-decoration: underline;
 }
 
-main {
-  padding: 1rem;
+button {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid #a5121c;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

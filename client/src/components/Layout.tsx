@@ -1,29 +1,27 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Outlet } from 'react-router-dom';
+import { BreadcrumbProvider, useBreadcrumbValue } from '../context/BreadcrumbContext';
+import { Sidebar } from './Sidebar';
+import { Topbar } from './Topbar';
 
-export function Layout() {
-  const { user, logout } = useAuth();
-  const isStaff = user?.role === 'admin' || user?.role === 'registrar' || user?.role === 'staff';
-
+function LayoutInner() {
+  const crumb = useBreadcrumbValue();
   return (
-    <div>
-      <nav>
-        <NavLink to="/dashboard">Dashboard</NavLink>
-        <NavLink to="/cases">Cases</NavLink>
-        {isStaff && <NavLink to="/arbitrators">Arbitrators</NavLink>}
-        {isStaff && <NavLink to="/parties">Parties</NavLink>}
-        {isStaff && <NavLink to="/organizations">Organizations</NavLink>}
-        {isStaff && <NavLink to="/projects">Projects</NavLink>}
-        <span style={{ marginLeft: 'auto' }}>
-          {user?.role} &nbsp;
-          <button type="button" onClick={() => logout()}>
-            Log out
-          </button>
-        </span>
-      </nav>
-      <main>
-        <Outlet />
+    <div className="min-h-screen grid grid-cols-[minmax(0,226px)_minmax(0,1fr)]">
+      <Sidebar />
+      <main className="min-w-0">
+        <Topbar crumb={crumb} />
+        <div className="px-26 pt-22 pb-60">
+          <Outlet />
+        </div>
       </main>
     </div>
+  );
+}
+
+export function Layout() {
+  return (
+    <BreadcrumbProvider>
+      <LayoutInner />
+    </BreadcrumbProvider>
   );
 }

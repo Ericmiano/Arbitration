@@ -13,8 +13,19 @@ arbitratorRoutes.use(requireAuth);
 const createArbitratorSchema = z.object({
   email: z.string().email(),
   fullName: z.string().min(1).max(255),
-  credentials: z.string().optional(),
+  aakMembershipNo: z.string().max(50).optional(),
+  currentPosition: z.string().max(255).optional(),
+  currentOrganization: z.string().max(255).optional(),
+  aakChapter: z.string().max(150).optional(),
+  yearsOfPractice: z.coerce.number().int().min(0).max(100).optional(),
+  phone: z.string().max(50).optional(),
+  bio: z.string().optional(),
+  adrExperienceNotes: z.string().optional(),
   specializations: z.array(z.string().min(1).max(150)).default([]),
+  qualifications: z.array(z.string().min(1).max(500)).default([]),
+  registrations: z
+    .array(z.object({ body: z.string().min(1).max(150), registrationNumber: z.string().max(100).optional() }))
+    .default([]),
   joinedAt: z.coerce.date().default(() => new Date()),
 });
 
@@ -50,13 +61,30 @@ arbitratorRoutes.post('/', requireRole('admin', 'registrar'), async (req, res, n
         data: {
           user_id: user.id,
           full_name: input.fullName,
-          credentials: input.credentials,
+          aak_membership_no: input.aakMembershipNo,
+          current_position: input.currentPosition,
+          current_organization: input.currentOrganization,
+          aak_chapter: input.aakChapter,
+          years_of_practice: input.yearsOfPractice,
+          phone: input.phone,
+          bio: input.bio,
+          adr_experience_notes: input.adrExperienceNotes,
           joined_at: input.joinedAt,
           arbitrator_specializations: {
             create: input.specializations.map((specialization) => ({ specialization })),
           },
+          arbitrator_qualifications: {
+            create: input.qualifications.map((qualification) => ({ qualification })),
+          },
+          arbitrator_registrations: {
+            create: input.registrations.map((r) => ({ body: r.body, registration_number: r.registrationNumber })),
+          },
         },
-        include: { arbitrator_specializations: true },
+        include: {
+          arbitrator_specializations: true,
+          arbitrator_qualifications: true,
+          arbitrator_registrations: true,
+        },
       });
     });
 
@@ -71,6 +99,8 @@ arbitratorRoutes.get('/', requireRole('admin', 'registrar', 'staff'), async (_re
     const arbitrators = await prisma.arbitrators.findMany({
       include: {
         arbitrator_specializations: true,
+        arbitrator_qualifications: true,
+        arbitrator_registrations: true,
         assignments: {
           where: { status: { in: ['ongoing', 'overdue', 'escalated'] } },
           select: { id: true, case_id: true, status: true, due_date: true },
@@ -112,6 +142,7 @@ arbitratorRoutes.get('/eligible', requireRole('admin', 'registrar', 'staff'), as
 
     const activeArbitrators = await prisma.arbitrators.findMany({
       where: { status: 'active' },
+      include: { arbitrator_specializations: true },
       orderBy: { score: 'desc' },
     });
 
@@ -175,3 +206,38 @@ arbitratorRoutes.post(
     }
   },
 );
+
+// Registered last: a literal path like /eligible would otherwise never be
+// reached, since Express matches routes in registration order and this
+// pattern matches any single path segment.
+arbitratorRoutes.get('/:arbitratorId', requireRole('admin', 'registrar', 'staff'), async (req, res, next) => {
+  try {
+    const arbitratorId = Number(req.params.arbitratorId);
+    if (!Number.isInteger(arbitratorId)) {
+      res.status(400).json({ error: 'Invalid arbitrator id' });
+      return;
+    }
+
+    const arbitrator = await prisma.arbitrators.findUnique({
+      where: { id: arbitratorId },
+      include: {
+        arbitrator_specializations: true,
+        arbitrator_qualifications: true,
+        arbitrator_registrations: true,
+        arbitrator_conflicts: true,
+        assignments: {
+          include: { cases: { select: { id: true, case_number: true, status: true, outcome: true } } },
+          orderBy: { assigned_at: 'desc' },
+        },
+      },
+    });
+    if (!arbitrator) {
+      res.status(404).json({ error: 'Arbitrator not found' });
+      return;
+    }
+
+    res.json(arbitrator);
+  } catch (error) {
+    next(error);
+  }
+});

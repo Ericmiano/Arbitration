@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { logAudit } from '../services/audit.service';
+import { resolveDisplayName } from '../services/userProfile.service';
 
 export const authRoutes = Router();
 
@@ -85,7 +86,8 @@ authRoutes.post('/login', loginLimiter, async (req, res, next) => {
       ipAddress: req.ip,
     });
 
-    res.json({ id: user.public_id, email: user.email, role: user.role });
+    const fullName = await resolveDisplayName(Number(user.id), user.role, user.email);
+    res.json({ id: user.public_id, email: user.email, role: user.role, fullName });
   } catch (error) {
     next(error);
   }
@@ -139,10 +141,51 @@ authRoutes.post('/logout', (req, res) => {
   });
 });
 
-authRoutes.get('/me', (req, res) => {
-  if (!req.session.user) {
-    res.status(401).json({ error: 'Not authenticated' });
-    return;
+authRoutes.get('/me', async (req, res, next) => {
+  try {
+    if (!req.session.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const user = await prisma.users.findUnique({ where: { id: req.session.user.id } });
+    if (!user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const fullName = await resolveDisplayName(req.session.user.id, req.session.user.role, user.email);
+    res.json({ id: req.session.user.id, role: req.session.user.role, fullName, email: user.email });
+  } catch (error) {
+    next(error);
   }
-  res.json(req.session.user);
+});
+
+const updateProfileSchema = z.object({
+  fullName: z.string().min(1).max(255),
+});
+
+/**
+ * Self-service display-name update. Only meaningfully affects staff/admin/
+ * registrar accounts - arbitrators and parties display their arbitrators/
+ * parties.full_name instead (see resolveDisplayName), which is managed
+ * through the arbitrator/party records, not here.
+ */
+authRoutes.patch('/profile', async (req, res, next) => {
+  try {
+    if (!req.session.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const parseResult = updateProfileSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({ error: 'fullName is required' });
+      return;
+    }
+    await prisma.users.update({
+      where: { id: req.session.user.id },
+      data: { full_name: parseResult.data.fullName },
+    });
+    res.json({ message: 'Profile updated' });
+  } catch (error) {
+    next(error);
+  }
 });

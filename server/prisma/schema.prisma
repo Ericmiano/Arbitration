@@ -1,13 +1,5 @@
-// schema.sql (repo root) is the source of truth for the database structure.
-// Models below are introspected from a live DB (`npm run prisma:pull`), not
-// hand-written - re-run prisma:pull + prisma:generate after editing schema.sql
-// and re-applying it, rather than editing models here directly.
-
 generator client {
   provider = "prisma-client-js"
-  // If deployment to the cPanel host fails with "engine not found for
-  // platform", add the host's platform identifier here, e.g.:
-  // binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -60,6 +52,14 @@ model arbitrators {
   id                         BigInt                       @id @default(autoincrement()) @db.UnsignedBigInt
   user_id                    BigInt                       @unique(map: "uq_arbitrators_user") @db.UnsignedBigInt
   full_name                  String                       @db.VarChar(255)
+  aak_membership_no          String?                      @db.VarChar(50)
+  current_position           String?                      @db.VarChar(255)
+  current_organization       String?                      @db.VarChar(255)
+  aak_chapter                String?                      @db.VarChar(150)
+  years_of_practice          Int?                         @db.UnsignedSmallInt
+  phone                      String?                      @db.VarChar(50)
+  bio                        String?                      @db.Text
+  adr_experience_notes       String?                      @db.Text
   credentials                String?                      @db.Text
   status                     arbitrators_status           @default(active)
   score                      Decimal                      @default(70.00) @db.Decimal(5, 2)
@@ -68,6 +68,8 @@ model arbitrators {
   joined_at                  DateTime                     @db.Date
   created_at                 DateTime                     @default(now()) @db.DateTime(0)
   arbitrator_conflicts       arbitrator_conflicts[]
+  arbitrator_qualifications  arbitrator_qualifications[]
+  arbitrator_registrations   arbitrator_registrations[]
   arbitrator_score_history   arbitrator_score_history[]
   arbitrator_specializations arbitrator_specializations[]
   users                      users                        @relation(fields: [user_id], references: [id], onUpdate: Restrict, map: "fk_arbitrators_user")
@@ -330,6 +332,7 @@ model users {
   public_id                                                       String                  @unique(map: "uq_users_public_id") @default(dbgenerated("(uuid())")) @db.Char(36)
   email                                                           String                  @unique(map: "uq_users_email") @db.VarChar(255)
   password_hash                                                   String                  @db.VarChar(255)
+  full_name                                                       String?                 @db.VarChar(255)
   role                                                            users_role
   status                                                          users_status            @default(active)
   mfa_secret                                                      String?                 @db.VarChar(255)
@@ -349,6 +352,31 @@ model users {
   documents                                                       documents[]
   notifications                                                   notifications[]
   parties                                                         parties[]
+}
+
+model sessions {
+  session_id String  @id @db.VarChar(128)
+  expires    Int     @db.UnsignedInt
+  data       String? @db.MediumText
+}
+
+model arbitrator_qualifications {
+  id            BigInt      @id @default(autoincrement()) @db.UnsignedBigInt
+  arbitrator_id BigInt      @db.UnsignedBigInt
+  qualification String      @db.VarChar(500)
+  arbitrators   arbitrators @relation(fields: [arbitrator_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_arb_qual_arbitrator")
+
+  @@index([arbitrator_id], map: "idx_arb_qual_arbitrator")
+}
+
+model arbitrator_registrations {
+  id                  BigInt      @id @default(autoincrement()) @db.UnsignedBigInt
+  arbitrator_id       BigInt      @db.UnsignedBigInt
+  body                String      @db.VarChar(150)
+  registration_number String?     @db.VarChar(100)
+  arbitrators         arbitrators @relation(fields: [arbitrator_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_arb_reg_arbitrator")
+
+  @@index([arbitrator_id], map: "idx_arb_reg_arbitrator")
 }
 
 enum sla_config_tier {

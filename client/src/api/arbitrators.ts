@@ -11,11 +11,25 @@ export async function listEligibleArbitrators(caseId: string): Promise<Arbitrato
   return data;
 }
 
+export async function getArbitrator(arbitratorId: string): Promise<Arbitrator> {
+  const { data } = await apiClient.get(`/arbitrators/${arbitratorId}`);
+  return data;
+}
+
 export interface CreateArbitratorInput {
   email: string;
   fullName: string;
-  credentials?: string;
+  aakMembershipNo?: string;
+  currentPosition?: string;
+  currentOrganization?: string;
+  aakChapter?: string;
+  yearsOfPractice?: number;
+  phone?: string;
+  bio?: string;
+  adrExperienceNotes?: string;
   specializations?: string[];
+  qualifications?: string[];
+  registrations?: Array<{ body: string; registrationNumber?: string }>;
 }
 
 export async function createArbitrator(
