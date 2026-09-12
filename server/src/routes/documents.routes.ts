@@ -95,6 +95,57 @@ documentRoutes.post('/', upload.single('file'), async (req, res, next) => {
   }
 });
 
+const listQuerySchema = z.object({
+  caseId: z.coerce.number().int().positive(),
+});
+
+/** Documents for a case, filtered down to what the current user may see. */
+documentRoutes.get('/', async (req, res, next) => {
+  try {
+    const parseResult = listQuerySchema.safeParse(req.query);
+    if (!parseResult.success) {
+      res.status(400).json({ error: 'caseId query parameter is required' });
+      return;
+    }
+    const { caseId } = parseResult.data;
+    const sessionUser = req.session.user!;
+
+    const hasAccess = await canAccessCase(caseId, sessionUser);
+    if (!hasAccess) {
+      res.status(404).json({ error: 'Case not found' });
+      return;
+    }
+
+    const documents = await prisma.documents.findMany({
+      where: { case_id: caseId },
+      orderBy: { created_at: 'desc' },
+    });
+
+    const visible = await Promise.all(
+      documents.map(async (document) => ({
+        document,
+        allowed: await canViewDocument(document, sessionUser),
+      })),
+    );
+
+    res.json(
+      visible
+        .filter((v) => v.allowed)
+        .map(({ document }) => ({
+          publicId: document.public_id,
+          fileName: document.file_name,
+          documentType: document.document_type,
+          visibility: document.visibility,
+          uploadedBy: document.uploaded_by,
+          scanStatus: document.scan_status,
+          createdAt: document.created_at,
+        })),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
 async function canViewDocument(
   document: { case_id: bigint; visibility: string; uploaded_by: bigint; id: bigint },
   sessionUser: { id: number; role: string },

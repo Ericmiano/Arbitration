@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
@@ -59,6 +61,57 @@ partyRoutes.post('/', async (req, res, next) => {
     });
 
     res.status(201).json(party);
+  } catch (error) {
+    next(error);
+  }
+});
+
+const inviteSchema = z.object({
+  email: z.string().email(),
+});
+
+/**
+ * Grants a party portal access - creates their login (role='party') and
+ * links it to the existing party record, so they can log in to view their
+ * own case(s) and documents shared with them. A party created purely for
+ * record-keeping (staff manage everything on their behalf) never needs this.
+ */
+partyRoutes.post('/:partyId/invite', async (req, res, next) => {
+  try {
+    const partyId = Number(req.params.partyId);
+    const parseResult = inviteSchema.safeParse(req.body);
+    if (!Number.isInteger(partyId) || !parseResult.success) {
+      res.status(400).json({ error: 'A valid email is required' });
+      return;
+    }
+
+    const party = await prisma.parties.findUnique({ where: { id: partyId } });
+    if (!party) {
+      res.status(404).json({ error: 'Party not found' });
+      return;
+    }
+    if (party.user_id) {
+      res.status(409).json({ error: 'Party already has portal access' });
+      return;
+    }
+
+    const existingUser = await prisma.users.findUnique({ where: { email: parseResult.data.email } });
+    if (existingUser) {
+      res.status(409).json({ error: 'A user with this email already exists' });
+      return;
+    }
+
+    const temporaryPassword = crypto.randomBytes(9).toString('base64url');
+    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+
+    await prisma.$transaction(async (tx) => {
+      const user = await tx.users.create({
+        data: { email: parseResult.data.email, password_hash: passwordHash, role: 'party' },
+      });
+      await tx.parties.update({ where: { id: partyId }, data: { user_id: user.id } });
+    });
+
+    res.status(201).json({ message: 'Portal access granted', temporaryPassword });
   } catch (error) {
     next(error);
   }

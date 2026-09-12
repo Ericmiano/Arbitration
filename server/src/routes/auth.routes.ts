@@ -91,6 +91,47 @@ authRoutes.post('/login', loginLimiter, async (req, res, next) => {
   }
 });
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+authRoutes.post('/change-password', async (req, res, next) => {
+  try {
+    if (!req.session.user) {
+      res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    const parseResult = changePasswordSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({ error: 'currentPassword and a newPassword of at least 8 characters are required' });
+      return;
+    }
+
+    const user = await prisma.users.findUniqueOrThrow({ where: { id: req.session.user.id } });
+    const currentMatches = await bcrypt.compare(parseResult.data.currentPassword, user.password_hash);
+    if (!currentMatches) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+
+    const newHash = await bcrypt.hash(parseResult.data.newPassword, 12);
+    await prisma.users.update({ where: { id: user.id }, data: { password_hash: newHash } });
+
+    await logAudit({
+      userId: Number(user.id),
+      action: 'password_changed',
+      entityType: 'user',
+      entityId: user.id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Password updated' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRoutes.post('/logout', (req, res) => {
   req.session.destroy(() => {
     res.clearCookie('connect.sid');

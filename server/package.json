@@ -14,7 +14,8 @@
     "prisma:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "job:overdue": "node dist/jobs/flagOverdueAssignments.js",
-    "job:overdue:dev": "tsx src/jobs/flagOverdueAssignments.ts"
+    "job:overdue:dev": "tsx src/jobs/flagOverdueAssignments.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -36,9 +37,13 @@
     "@types/express-session": "^1.18.0",
     "@types/multer": "^1.4.12",
     "@types/node": "^22.7.4",
+    "@types/supertest": "^6.0.2",
     "prisma": "^5.20.0",
+    "supertest": "^7.0.0",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "vite": "^6.4.0",
+    "vitest": "^5.0.0"
   },
   "overrides": {
     "mysql2": "^3.24.0",

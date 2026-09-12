@@ -1,3 +1,4 @@
+import './lib/bigintJson';
 import cors from 'cors';
 import express from 'express';
 import session from 'express-session';
