@@ -131,6 +131,43 @@ assignmentRoutes.post('/:assignmentId/extensions', async (req, res, next) => {
   }
 });
 
+assignmentRoutes.get('/:assignmentId/extensions', async (req, res, next) => {
+  try {
+    const assignmentId = Number(req.params.assignmentId);
+    if (!Number.isInteger(assignmentId)) {
+      res.status(400).json({ error: 'Invalid assignment id' });
+      return;
+    }
+
+    const assignment = await prisma.assignments.findUnique({
+      where: { id: assignmentId },
+      include: { arbitrators: true },
+    });
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const sessionUser = req.session.user!;
+    const isOwningArbitrator =
+      sessionUser.role === 'arbitrator' && Number(assignment.arbitrators.user_id) === sessionUser.id;
+    const isStaff = ['admin', 'registrar', 'staff'].includes(sessionUser.role);
+    if (!isOwningArbitrator && !isStaff) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    const extensions = await prisma.assignment_extensions.findMany({
+      where: { assignment_id: assignmentId },
+      orderBy: { requested_at: 'desc' },
+    });
+
+    res.json(extensions);
+  } catch (error) {
+    next(error);
+  }
+});
+
 const decideExtensionSchema = z.object({
   decision: z.enum(['approved', 'rejected']),
 });

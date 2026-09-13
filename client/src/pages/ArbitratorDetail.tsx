@@ -1,18 +1,56 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getArbitrator } from '../api/arbitrators';
+import { declareConflict, getArbitrator } from '../api/arbitrators';
+import { listOrganizations } from '../api/organizations';
+import { listParties } from '../api/parties';
+import { useAuth } from '../context/AuthContext';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
-import { ArbitratorProfile } from '../types';
+import { ArbitratorProfile, Organization, Party } from '../types';
 
 export function ArbitratorDetail() {
   const { arbitratorId } = useParams();
+  const { user } = useAuth();
+  const canDeclareConflict = user?.role === 'admin' || user?.role === 'registrar';
   const [arbitrator, setArbitrator] = useState<ArbitratorProfile | null>(null);
+  const [parties, setParties] = useState<Party[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [showConflictForm, setShowConflictForm] = useState(false);
+  const [conflictTarget, setConflictTarget] = useState<'party' | 'organization'>('party');
+  const [error, setError] = useState<string | null>(null);
+
+  function reload() {
+    if (arbitratorId) getArbitrator(arbitratorId).then(setArbitrator);
+  }
+
+  useEffect(reload, [arbitratorId]);
 
   useEffect(() => {
-    if (arbitratorId) getArbitrator(arbitratorId).then(setArbitrator);
-  }, [arbitratorId]);
+    if (canDeclareConflict) {
+      listParties().then(setParties);
+      listOrganizations().then(setOrganizations);
+    }
+  }, [canDeclareConflict]);
 
   useBreadcrumb(arbitrator ? `ARBITRATORS / ${arbitrator.full_name.toUpperCase()}` : undefined);
+
+  async function handleDeclareConflict(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!arbitratorId) return;
+    setError(null);
+    const form = new FormData(event.currentTarget);
+    try {
+      await declareConflict(arbitratorId, {
+        partyId: conflictTarget === 'party' ? Number(form.get('targetId')) : undefined,
+        organizationId: conflictTarget === 'organization' ? Number(form.get('targetId')) : undefined,
+        reason: String(form.get('reason')),
+      });
+      setShowConflictForm(false);
+      reload();
+    } catch (err) {
+      const message = (err as { response?: { data?: { error?: unknown } } }).response?.data?.error;
+      setError(typeof message === 'string' ? message : 'Failed to declare conflict');
+    }
+  }
 
   if (!arbitrator) return <p>Loading...</p>;
 
@@ -48,17 +86,79 @@ export function ArbitratorDetail() {
         />
       </div>
 
-      {activeConflicts.length > 0 && (
+      {(activeConflicts.length > 0 || canDeclareConflict) && (
         <div className="px-20 py-14 border-b border-rule">
-          <div className="font-mono text-9.5 tracking-[0.12em] text-muted">DECLARED CONFLICTS</div>
-          <ul className="mt-8 space-y-4">
-            {activeConflicts.map((c) => (
-              <li key={c.id} className="text-13 text-red flex items-baseline gap-8">
-                <span className="w-7 h-7 bg-red inline-block shrink-0" />
-                {c.reason}
-              </li>
-            ))}
-          </ul>
+          <div className="flex items-baseline gap-14">
+            <span className="font-mono text-9.5 tracking-[0.12em] text-muted">DECLARED CONFLICTS</span>
+            {canDeclareConflict && (
+              <button
+                type="button"
+                onClick={() => setShowConflictForm((v) => !v)}
+                className="ml-auto bg-transparent border-0 border-b border-ink py-2 text-12 cursor-pointer hover:text-red hover:border-red"
+              >
+                {showConflictForm ? 'Cancel' : 'Declare conflict'}
+              </button>
+            )}
+          </div>
+
+          {activeConflicts.length > 0 ? (
+            <ul className="mt-8 space-y-4">
+              {activeConflicts.map((c) => (
+                <li key={c.id} className="text-13 text-red flex items-baseline gap-8">
+                  <span className="w-7 h-7 bg-red inline-block shrink-0" />
+                  {c.reason}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            !showConflictForm && <p className="mt-8 text-13 text-green">No declared conflicts on file.</p>
+          )}
+
+          {showConflictForm && (
+            <form onSubmit={handleDeclareConflict} className="mt-12 pt-12 border-t border-hairline max-w-[420px]">
+              <div className="flex gap-14">
+                <label className="flex items-center gap-6 text-12.5">
+                  <input
+                    type="radio"
+                    checked={conflictTarget === 'party'}
+                    onChange={() => setConflictTarget('party')}
+                  />
+                  Party
+                </label>
+                <label className="flex items-center gap-6 text-12.5">
+                  <input
+                    type="radio"
+                    checked={conflictTarget === 'organization'}
+                    onChange={() => setConflictTarget('organization')}
+                  />
+                  Organization
+                </label>
+              </div>
+              <select name="targetId" required defaultValue="" className="mt-8 w-full border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+                <option value="" disabled>
+                  Select {conflictTarget}
+                </option>
+                {(conflictTarget === 'party' ? parties : organizations).map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {'full_name' in item ? item.full_name : item.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                name="reason"
+                placeholder="Reason"
+                required
+                className="mt-8 w-full border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+              />
+              {error && <p className="mt-8 text-12.5 text-red">{error}</p>}
+              <button
+                type="submit"
+                className="mt-10 min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
+              >
+                Declare
+              </button>
+            </form>
+          )}
         </div>
       )}
 

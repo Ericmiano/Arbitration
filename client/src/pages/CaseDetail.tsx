@@ -2,9 +2,11 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { listEligibleArbitrators } from '../api/arbitrators';
 import {
+  AssignmentExtension,
   completeAssignment,
   createAssignment,
   decideExtension,
+  listExtensions,
   requestExtension,
   withdrawAssignment,
 } from '../api/assignments';
@@ -36,12 +38,21 @@ export function CaseDetail() {
   const [caseRecord, setCaseRecord] = useState<Case | null>(null);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [eligible, setEligible] = useState<Arbitrator[]>([]);
+  const [extensions, setExtensions] = useState<AssignmentExtension[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('Overview');
 
   function reload() {
     if (!caseId) return;
-    getCase(caseId).then(setCaseRecord);
+    getCase(caseId).then((c) => {
+      setCaseRecord(c);
+      const activeAssignment = getActiveAssignment(c);
+      if (activeAssignment) {
+        listExtensions(activeAssignment.id).then(setExtensions);
+      } else {
+        setExtensions([]);
+      }
+    });
     listDocuments(caseId).then(setDocuments);
   }
 
@@ -122,6 +133,11 @@ export function CaseDetail() {
     );
   }
 
+  async function handleDecideExtension(extensionId: string, decision: 'approved' | 'rejected') {
+    if (!assignment) return;
+    await withAsyncAction(() => decideExtension(assignment.id, extensionId, decision));
+  }
+
   async function handleWithdraw() {
     if (!assignment) return;
     const reason = window.prompt('Reason for withdrawing this arbitrator?');
@@ -174,13 +190,15 @@ export function CaseDetail() {
           >
             Schedule hearing
           </button>
-          <button
-            type="button"
-            onClick={() => setTab('Arbitrator')}
-            className="min-h-[31px] px-14 py-6 bg-red border border-red text-white text-12.5 font-medium cursor-pointer whitespace-nowrap hover:bg-red-hover"
-          >
-            {assignment ? 'Record outcome' : 'Assign arbitrator'}
-          </button>
+          {group !== 'closed' && (
+            <button
+              type="button"
+              onClick={() => setTab('Arbitrator')}
+              className="min-h-[31px] px-14 py-6 bg-red border border-red text-white text-12.5 font-medium cursor-pointer whitespace-nowrap hover:bg-red-hover"
+            >
+              {assignment ? 'Record outcome' : 'Assign arbitrator'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -316,6 +334,53 @@ export function CaseDetail() {
                       </button>
                     </div>
                   </form>
+
+                  {extensions.length > 0 && (
+                    <div className="mt-20 pt-16 border-t border-rule max-w-[420px]">
+                      <div className="font-mono text-9.5 tracking-[0.12em] text-muted">EXTENSION REQUESTS</div>
+                      <div className="mt-8">
+                        {extensions.map((ext) => (
+                          <div key={ext.id} className="py-8 border-t border-hairline first:border-t-0">
+                            <div className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
+                              <span className="text-13">{ext.reason}</span>
+                              <span className="font-mono text-10.5 text-muted-2">
+                                new due {formatMonoDate(ext.new_due_date)}
+                              </span>
+                              <span
+                                className={`font-mono text-10.5 uppercase ml-auto ${
+                                  ext.status === 'pending'
+                                    ? 'text-amber'
+                                    : ext.status === 'approved'
+                                      ? 'text-green'
+                                      : 'text-muted-2'
+                                }`}
+                              >
+                                {ext.status}
+                              </span>
+                            </div>
+                            {isStaff && ext.status === 'pending' && (
+                              <div className="mt-6 flex gap-8">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecideExtension(ext.id, 'approved')}
+                                  className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDecideExtension(ext.id, 'rejected')}
+                                  className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <form onSubmit={handleComplete} className="mt-20 pt-16 border-t border-rule max-w-[420px]">
                     <div className="font-mono text-9.5 tracking-[0.12em] text-muted">RECORD OUTCOME</div>

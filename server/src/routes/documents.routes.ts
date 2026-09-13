@@ -96,28 +96,40 @@ documentRoutes.post('/', upload.single('file'), async (req, res, next) => {
 });
 
 const listQuerySchema = z.object({
-  caseId: z.coerce.number().int().positive(),
+  caseId: z.coerce.number().int().positive().optional(),
 });
 
-/** Documents for a case, filtered down to what the current user may see. */
+/**
+ * Documents for one case (?caseId=), or - with no caseId - the full register
+ * across every case the current user can access (staff: all; arbitrator:
+ * their assigned cases; party: their own cases), for the Document register
+ * screen. Either way, results are filtered per-document by canViewDocument.
+ */
 documentRoutes.get('/', async (req, res, next) => {
   try {
     const parseResult = listQuerySchema.safeParse(req.query);
     if (!parseResult.success) {
-      res.status(400).json({ error: 'caseId query parameter is required' });
+      res.status(400).json({ error: 'Invalid caseId' });
       return;
     }
     const { caseId } = parseResult.data;
     const sessionUser = req.session.user!;
 
-    const hasAccess = await canAccessCase(caseId, sessionUser);
-    if (!hasAccess) {
-      res.status(404).json({ error: 'Case not found' });
-      return;
+    let caseIds: number[];
+    if (caseId !== undefined) {
+      const hasAccess = await canAccessCase(caseId, sessionUser);
+      if (!hasAccess) {
+        res.status(404).json({ error: 'Case not found' });
+        return;
+      }
+      caseIds = [caseId];
+    } else {
+      caseIds = await accessibleCaseIds(sessionUser);
     }
 
     const documents = await prisma.documents.findMany({
-      where: { case_id: caseId },
+      where: { case_id: { in: caseIds } },
+      include: { cases_documents_case_idTocases: { select: { id: true, case_number: true } } },
       orderBy: { created_at: 'desc' },
     });
 
@@ -139,12 +151,38 @@ documentRoutes.get('/', async (req, res, next) => {
           uploadedBy: document.uploaded_by,
           scanStatus: document.scan_status,
           createdAt: document.created_at,
+          caseId: document.cases_documents_case_idTocases.id,
+          caseNumber: document.cases_documents_case_idTocases.case_number,
         })),
     );
   } catch (error) {
     next(error);
   }
 });
+
+async function accessibleCaseIds(sessionUser: { id: number; role: string }): Promise<number[]> {
+  if (['admin', 'registrar', 'staff'].includes(sessionUser.role)) {
+    const all = await prisma.cases.findMany({ select: { id: true } });
+    return all.map((c) => Number(c.id));
+  }
+
+  if (sessionUser.role === 'arbitrator') {
+    const arbitrator = await prisma.arbitrators.findUnique({ where: { user_id: sessionUser.id } });
+    if (!arbitrator) return [];
+    const assignments = await prisma.assignments.findMany({
+      where: { arbitrator_id: arbitrator.id },
+      select: { case_id: true },
+    });
+    return [...new Set(assignments.map((a) => Number(a.case_id)))];
+  }
+
+  // role === 'party'
+  const memberships = await prisma.case_parties.findMany({
+    where: { parties: { user_id: sessionUser.id } },
+    select: { case_id: true },
+  });
+  return [...new Set(memberships.map((m) => Number(m.case_id)))];
+}
 
 async function canViewDocument(
   document: { case_id: bigint; visibility: string; uploaded_by: bigint; id: bigint },

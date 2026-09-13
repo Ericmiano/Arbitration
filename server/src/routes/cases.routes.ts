@@ -15,8 +15,14 @@ caseRoutes.use(requireAuth);
 const caseSummaryInclude: Prisma.casesInclude = {
   case_parties: { include: { parties: { select: { id: true, full_name: true } } } },
   assignments: {
-    where: { status: { in: ['ongoing', 'overdue', 'escalated'] } },
+    // Includes 'completed' - once a case concludes its arbitrator's
+    // assignment status flips to 'completed', and without it here the
+    // frontend loses track of who the arbitrator ever was on a closed case.
+    // 'withdrawn'/'reassigned' stay excluded since those aren't current.
+    where: { status: { in: ['ongoing', 'overdue', 'escalated', 'completed'] } },
     include: { arbitrators: { select: { id: true, full_name: true } } },
+    orderBy: { assigned_at: 'desc' },
+    take: 1,
   },
   projects: { select: { id: true, name: true, location: true } },
 };

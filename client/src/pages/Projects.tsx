@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { listParties } from '../api/parties';
 import { createContract, createProject, listProjects } from '../api/projects';
 import { Party, Project } from '../types';
+import { formatMoney } from '../lib/caseDisplay';
 
 export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -63,94 +64,99 @@ export function Projects() {
   }
 
   return (
-    <div>
-      <h1>Projects</h1>
+    <div className="bg-sheet border border-ink">
+      <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-26 gap-y-18 items-end">
+        <div className="flex-1 min-w-[240px]">
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Projects</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">{projects.length} ON RECORD</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowProjectForm((v) => !v)}
+          className="min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer whitespace-nowrap hover:bg-red-hover"
+        >
+          {showProjectForm ? 'Cancel' : 'New project'}
+        </button>
+      </div>
 
-      <button type="button" onClick={() => setShowProjectForm((v) => !v)}>
-        {showProjectForm ? 'Cancel' : 'New Project'}
-      </button>
-
-      {error && (
-        <p role="alert" style={{ color: 'crimson' }}>
-          {error}
-        </p>
-      )}
+      {error && <p className="px-24 pt-12 text-13 text-red">{error}</p>}
 
       {showProjectForm && (
-        <form onSubmit={handleCreateProject} style={{ marginTop: '1rem', maxWidth: 420 }}>
-          <div>
-            <label>
-              Name
-              <br />
-              <input name="name" required style={{ width: '100%' }} />
-            </label>
+        <form onSubmit={handleCreateProject} className="px-24 py-20 border-b border-rule bg-band-alt max-w-[420px]">
+          <Field label="Name">
+            <input name="name" required className={inputClass} />
+          </Field>
+          <div className="mt-14">
+            <Field label="Sector">
+              <input name="sector" className={inputClass} />
+            </Field>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Sector
-              <br />
-              <input name="sector" style={{ width: '100%' }} />
-            </label>
+          <div className="mt-14">
+            <Field label="Value">
+              <div className="flex gap-8">
+                <input name="value" type="number" min="0" step="0.01" className={inputClass} />
+                <select name="currency" defaultValue="KES" className={`${inputClass} flex-[0_0_90px]`}>
+                  <option value="KES">KES</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </Field>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Value
-              <br />
-              <input name="value" type="number" min="0" step="0.01" />
-              &nbsp;
-              <select name="currency" defaultValue="KES">
-                <option value="KES">KES</option>
-                <option value="USD">USD</option>
-              </select>
-            </label>
-          </div>
-          <button type="submit" style={{ marginTop: '0.5rem' }}>
+          <button
+            type="submit"
+            className="mt-16 min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover"
+          >
             Create
           </button>
         </form>
       )}
 
       {projects.map((project) => (
-        <div key={project.id} style={{ marginTop: '1.5rem', borderTop: '1px solid #ccc', paddingTop: '0.5rem' }}>
-          <h2>{project.name}</h2>
-          <p>
-            {project.sector} &middot; {project.currency} {project.value ?? '-'}
-          </p>
+        <div key={project.id} className="border-b border-hairline px-24 py-18">
+          <div className="text-15 font-semibold tracking-[-0.01em]">{project.name}</div>
+          <div className="mt-4 font-mono text-10.5 text-muted uppercase">
+            {project.sector} {project.sector && '·'} {project.value ? formatMoney(project.value, project.currency) : ''}
+          </div>
 
-          <h3>Contracts</h3>
-          <ul>
-            {project.contracts?.map((c) => (
-              <li key={c.id}>
-                {c.reference_number ?? c.id} - {c.has_arbitration_clause ? 'has arbitration clause' : 'no clause'}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-14">
+            <div className="font-mono text-9.5 tracking-[0.11em] text-muted uppercase">Contracts</div>
+            {project.contracts && project.contracts.length > 0 ? (
+              <div className="mt-8">
+                {project.contracts.map((c) => (
+                  <div key={c.id} className="py-6 border-t border-hairline text-13 flex items-baseline gap-8">
+                    <span className="font-mono">{c.reference_number ?? c.id}</span>
+                    <span className={c.has_arbitration_clause ? 'text-green' : 'text-muted'}>
+                      {c.has_arbitration_clause ? 'Has arbitration clause' : 'No arbitration clause'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-6 text-13 text-muted">No contracts yet.</p>
+            )}
+          </div>
 
-          <button type="button" onClick={() => setContractProjectId(contractProjectId === project.id ? null : project.id)}>
+          <button
+            type="button"
+            onClick={() => setContractProjectId(contractProjectId === project.id ? null : project.id)}
+            className="mt-12 bg-transparent border-0 border-b border-ink py-2 text-12.5 cursor-pointer hover:text-red hover:border-red"
+          >
             {contractProjectId === project.id ? 'Cancel' : 'Add contract'}
           </button>
 
           {contractProjectId === project.id && (
-            <form onSubmit={handleCreateContract} style={{ marginTop: '0.5rem', maxWidth: 420 }}>
-              <div>
-                <label>
-                  Reference number
-                  <br />
-                  <input name="referenceNumber" style={{ width: '100%' }} />
-                </label>
-              </div>
-              <div style={{ marginTop: '0.5rem' }}>
-                <label>
-                  <input type="checkbox" name="hasArbitrationClause" /> Has an arbitration clause
-                </label>
-              </div>
-              <div style={{ marginTop: '0.5rem' }}>
-                <label>
-                  Employer / first party
-                  <br />
-                  <select name="employerPartyId" required defaultValue="">
+            <form onSubmit={handleCreateContract} className="mt-14 max-w-[420px] p-16 bg-band-alt">
+              <Field label="Reference number">
+                <input name="referenceNumber" className={inputClass} />
+              </Field>
+              <label className="mt-14 flex items-center gap-8 text-13">
+                <input type="checkbox" name="hasArbitrationClause" /> Has an arbitration clause
+              </label>
+              <div className="mt-14 grid grid-cols-2 gap-14">
+                <Field label="Employer / first party">
+                  <select name="employerPartyId" required defaultValue="" className={inputClass}>
                     <option value="" disabled>
-                      -- select --
+                      Select
                     </option>
                     {parties.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -158,15 +164,11 @@ export function Projects() {
                       </option>
                     ))}
                   </select>
-                </label>
-              </div>
-              <div style={{ marginTop: '0.5rem' }}>
-                <label>
-                  Contractor / second party
-                  <br />
-                  <select name="contractorPartyId" required defaultValue="">
+                </Field>
+                <Field label="Contractor / second party">
+                  <select name="contractorPartyId" required defaultValue="" className={inputClass}>
                     <option value="" disabled>
-                      -- select --
+                      Select
                     </option>
                     {parties.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -174,15 +176,30 @@ export function Projects() {
                       </option>
                     ))}
                   </select>
-                </label>
+                </Field>
               </div>
-              <button type="submit" style={{ marginTop: '0.5rem' }}>
+              <button
+                type="submit"
+                className="mt-16 min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover"
+              >
                 Create contract
               </button>
             </form>
           )}
         </div>
       ))}
+      {projects.length === 0 && <p className="px-24 py-20 text-13">No projects on record yet.</p>}
     </div>
+  );
+}
+
+const inputClass = 'w-full border-0 border-b border-rule bg-transparent py-6 text-13 outline-none';
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-6">
+      <span className="font-mono text-9.5 tracking-[0.11em] text-muted uppercase">{label}</span>
+      {children}
+    </label>
   );
 }

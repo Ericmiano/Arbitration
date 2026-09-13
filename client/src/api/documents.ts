@@ -6,6 +6,12 @@ export async function listDocuments(caseId: string): Promise<DocumentSummary[]> 
   return data;
 }
 
+/** The full document register across every case the current user can access. */
+export async function listAllDocuments(): Promise<DocumentSummary[]> {
+  const { data } = await apiClient.get('/documents');
+  return data;
+}
+
 export async function uploadDocument(
   caseId: string,
   documentType: string,

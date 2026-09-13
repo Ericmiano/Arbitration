@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { createParty, invitePartyToPortal, listParties } from '../api/parties';
 import { listOrganizations } from '../api/organizations';
 import { Organization, Party } from '../types';
@@ -52,44 +53,47 @@ export function Parties() {
   }
 
   return (
-    <div>
-      <h1>Parties</h1>
-
-      <button type="button" onClick={() => setShowForm((v) => !v)}>
-        {showForm ? 'Cancel' : 'New Party'}
-      </button>
+    <div className="bg-sheet border border-ink">
+      <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-26 gap-y-18 items-end">
+        <div className="flex-1 min-w-[240px]">
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Parties</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">{parties.length} ON RECORD</div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer whitespace-nowrap hover:bg-red-hover"
+        >
+          {showForm ? 'Cancel' : 'New party'}
+        </button>
+      </div>
 
       {invited && (
-        <p style={{ background: '#fffbcc', padding: '0.5rem' }}>
-          Portal access granted for {invited.email} - temporary password: <code>{invited.password}</code>
-        </p>
+        <div className="px-24 py-12 bg-band border-b border-rule text-13">
+          Portal access granted for <strong>{invited.email}</strong> - temporary password:{' '}
+          <code className="font-mono">{invited.password}</code>
+        </div>
       )}
-      {error && (
-        <p role="alert" style={{ color: 'crimson' }}>
-          {error}
-        </p>
-      )}
+      {error && <p className="px-24 pt-12 text-13 text-red">{error}</p>}
 
       {showForm && (
-        <form onSubmit={handleCreate} style={{ marginTop: '1rem', maxWidth: 420 }}>
-          <div>
-            <label>
-              Type
-              <br />
-              <select value={type} onChange={(e) => setType(e.target.value as 'individual' | 'organization')}>
-                <option value="individual">Individual</option>
-                <option value="organization">Organization</option>
-              </select>
-            </label>
-          </div>
+        <form onSubmit={handleCreate} className="px-24 py-20 border-b border-rule bg-band-alt max-w-[420px]">
+          <Field label="Type">
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as 'individual' | 'organization')}
+              className={inputClass}
+            >
+              <option value="individual">Individual</option>
+              <option value="organization">Organization</option>
+            </select>
+          </Field>
           {type === 'organization' && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <label>
-                Organization
-                <br />
-                <select name="organizationId" required>
+            <div className="mt-14">
+              <Field label="Organization">
+                <select name="organizationId" required defaultValue="" className={inputClass}>
                   <option value="" disabled>
-                    -- select --
+                    Select
                   </option>
                   {organizations.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -97,66 +101,71 @@ export function Parties() {
                     </option>
                   ))}
                 </select>
-              </label>
+              </Field>
+              <Link
+                to="/organizations"
+                className="mt-6 inline-block font-mono text-10 tracking-[0.04em] border-b border-ink pb-1 hover:text-red hover:border-red"
+              >
+                + New organization
+              </Link>
             </div>
           )}
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Full name / contact person
-              <br />
-              <input name="fullName" required style={{ width: '100%' }} />
-            </label>
+          <div className="mt-14">
+            <Field label="Full name / contact person">
+              <input name="fullName" required className={inputClass} />
+            </Field>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Email
-              <br />
-              <input name="email" type="email" style={{ width: '100%' }} />
-            </label>
+          <div className="mt-14">
+            <Field label="Email">
+              <input name="email" type="email" className={inputClass} />
+            </Field>
           </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <label>
-              Phone
-              <br />
-              <input name="phone" style={{ width: '100%' }} />
-            </label>
+          <div className="mt-14">
+            <Field label="Phone">
+              <input name="phone" className={inputClass} />
+            </Field>
           </div>
-          <button type="submit" style={{ marginTop: '0.5rem' }}>
+          <button
+            type="submit"
+            className="mt-16 min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover"
+          >
             Create
           </button>
         </form>
       )}
 
-      <table style={{ marginTop: '1rem', borderCollapse: 'collapse', width: '100%' }}>
-        <thead>
-          <tr>
-            <th style={cellStyle}>Name</th>
-            <th style={cellStyle}>Type</th>
-            <th style={cellStyle}>Email</th>
-            <th style={cellStyle}>Portal access</th>
-          </tr>
-        </thead>
-        <tbody>
-          {parties.map((p) => (
-            <tr key={p.id}>
-              <td style={cellStyle}>{p.full_name}</td>
-              <td style={cellStyle}>{p.type}</td>
-              <td style={cellStyle}>{p.email}</td>
-              <td style={cellStyle}>
-                {p.user_id ? (
-                  'Granted'
-                ) : (
-                  <button type="button" onClick={() => handleInvite(p.id)}>
-                    Grant access
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {parties.map((p) => (
+        <div key={p.id} className="px-24 py-14 border-b border-hairline flex flex-wrap gap-x-16 gap-y-4 items-baseline">
+          <span className="flex-[1_1_220px] min-w-0 text-13.5 font-medium">{p.full_name}</span>
+          <span className="flex-[0_0_120px] font-mono text-10.5 tracking-[0.06em] text-muted uppercase">{p.type}</span>
+          <span className="flex-[1_1_200px] min-w-0 text-13 text-ink-2">{p.email}</span>
+          <span className="ml-auto">
+            {p.user_id ? (
+              <span className="font-mono text-10.5 text-green">PORTAL ACCESS GRANTED</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleInvite(p.id)}
+                className="min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
+              >
+                Grant access
+              </button>
+            )}
+          </span>
+        </div>
+      ))}
+      {parties.length === 0 && <p className="px-24 py-20 text-13">No parties on record yet.</p>}
     </div>
   );
 }
 
-const cellStyle = { border: '1px solid #ccc', padding: '0.4rem', textAlign: 'left' as const };
+const inputClass = 'w-full border-0 border-b border-rule bg-transparent py-6 text-13 outline-none';
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-6">
+      <span className="font-mono text-9.5 tracking-[0.11em] text-muted uppercase">{label}</span>
+      {children}
+    </label>
+  );
+}

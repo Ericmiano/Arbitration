@@ -133,6 +133,9 @@ export interface DocumentSummary {
   uploadedBy: string;
   scanStatus: string;
   createdAt: string;
+  /** Present when listed via the cross-case register (no caseId filter). */
+  caseId?: string;
+  caseNumber?: string;
 }
 
 export interface AppNotification {

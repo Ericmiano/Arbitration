@@ -10,4 +10,7 @@ server/tests/tmp-storage/*
 *.tsbuildinfo
 storage/documents/*
 !storage/documents/.gitkeep
+client/e2e/.auth/
+client/test-results/
+client/playwright-report/
 .DS_Store

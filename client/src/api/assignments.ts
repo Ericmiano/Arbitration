@@ -12,6 +12,24 @@ export async function requestExtension(
   await apiClient.post(`/assignments/${assignmentId}/extensions`, { reason, requestedDueDate });
 }
 
+export interface AssignmentExtension {
+  id: string;
+  assignment_id: string;
+  requested_by: string;
+  requested_at: string;
+  reason: string;
+  previous_due_date: string;
+  new_due_date: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decided_by: string | null;
+  decided_at: string | null;
+}
+
+export async function listExtensions(assignmentId: string): Promise<AssignmentExtension[]> {
+  const { data } = await apiClient.get(`/assignments/${assignmentId}/extensions`);
+  return data;
+}
+
 export async function decideExtension(
   assignmentId: string,
   extensionId: string,

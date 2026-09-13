@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { createCase } from '../api/cases';
 import { listParties } from '../api/parties';
 import { listProjects } from '../api/projects';
@@ -54,9 +54,19 @@ export function NewCase() {
 
   return (
     <div className="bg-sheet border border-ink max-w-[720px]">
-      <div className="px-24 pt-22 pb-18 border-b border-ink">
-        <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Start new arbitration</h1>
-        <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">PARTIES · PROJECT · DISPUTE</div>
+      <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap items-end justify-between gap-16">
+        <div>
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Start new arbitration</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">PARTIES · PROJECT · DISPUTE</div>
+        </div>
+        <div className="flex gap-14 font-mono text-10.5 tracking-[0.04em]">
+          <Link to="/parties" className="border-b border-ink pb-1 hover:text-red hover:border-red">
+            + New party
+          </Link>
+          <Link to="/projects" className="border-b border-ink pb-1 hover:text-red hover:border-red">
+            + New project/contract
+          </Link>
+        </div>
       </div>
 
       <form onSubmit={handleCreate} className="px-24 py-20">
