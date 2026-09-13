@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { createUser, listUsers, updateUser, UserSummary } from '../api/users';
+import { downloadCsv } from '../lib/csv';
 import { useAuth } from '../context/AuthContext';
 
 const EDITABLE_ROLES = ['admin', 'registrar', 'staff'];
@@ -49,15 +50,36 @@ export function Users() {
     }
   }
 
+  function handleExport() {
+    if (!users) return;
+    downloadCsv(
+      `aak-users-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        { header: 'Full name', value: (u: UserSummary) => u.fullName },
+        { header: 'Email', value: (u: UserSummary) => u.email },
+        { header: 'Role', value: (u: UserSummary) => u.role },
+        { header: 'Status', value: (u: UserSummary) => u.status },
+        { header: 'Last login', value: (u: UserSummary) => u.lastLoginAt ?? '' },
+        { header: 'Created at', value: (u: UserSummary) => u.createdAt },
+      ],
+      users,
+    );
+  }
+
   if (!users) return <p>Loading...</p>;
 
   return (
     <div className="bg-sheet border border-ink">
-      <div className="px-24 pt-22 pb-18 border-b border-ink">
-        <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Users</h1>
-        <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
-          {users.length} account{users.length === 1 ? '' : 's'}
+      <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-16 gap-y-10 items-end">
+        <div className="flex-1 min-w-[200px]">
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Users</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
+            {users.length} account{users.length === 1 ? '' : 's'}
+          </div>
         </div>
+        <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+          Export CSV
+        </button>
       </div>
 
       {error && <p className="px-24 pt-14 text-13 text-red">{error}</p>}

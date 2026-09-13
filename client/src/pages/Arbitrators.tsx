@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createArbitrator, listArbitrators } from '../api/arbitrators';
+import { downloadCsv } from '../lib/csv';
 import { Arbitrator } from '../types';
 
 export function Arbitrators() {
@@ -8,12 +9,43 @@ export function Arbitrators() {
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [query, setQuery] = useState('');
 
   function reload() {
     listArbitrators().then(setArbitrators);
   }
 
   useEffect(reload, []);
+
+  const filtered = useMemo(() => {
+    if (!arbitrators) return null;
+    const q = query.trim().toLowerCase();
+    if (!q) return arbitrators;
+    return arbitrators.filter((a) =>
+      [a.full_name, a.aak_membership_no, a.current_organization, ...a.arbitrator_specializations.map((s) => s.specialization)]
+        .filter(Boolean)
+        .some((field) => String(field).toLowerCase().includes(q)),
+    );
+  }, [arbitrators, query]);
+
+  function handleExport() {
+    if (!filtered) return;
+    downloadCsv(
+      `aak-arbitrators-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        { header: 'Full name', value: (a: Arbitrator) => a.full_name },
+        { header: 'AAK membership no.', value: (a: Arbitrator) => a.aak_membership_no ?? '' },
+        { header: 'Status', value: (a: Arbitrator) => a.status },
+        { header: 'Score', value: (a: Arbitrator) => a.score },
+        { header: 'Cases closed', value: (a: Arbitrator) => a.cases_closed_count },
+        { header: 'Years of practice', value: (a: Arbitrator) => a.years_of_practice ?? '' },
+        { header: 'Current position', value: (a: Arbitrator) => a.current_position ?? '' },
+        { header: 'Current organization', value: (a: Arbitrator) => a.current_organization ?? '' },
+        { header: 'Specializations', value: (a: Arbitrator) => a.arbitrator_specializations.map((s) => s.specialization).join('; ') },
+      ],
+      filtered,
+    );
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,6 +90,15 @@ export function Arbitrators() {
             {arbitrators ? `${arbitrators.length} ON THE REGISTER` : 'LOADING...'}
           </div>
         </div>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search name, membership no., specialization"
+          className="w-[240px] border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+        />
+        <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+          Export CSV
+        </button>
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
@@ -112,12 +153,14 @@ export function Arbitrators() {
         </form>
       )}
 
-      {arbitrators === null ? (
+      {filtered === null ? (
         <p className="px-24 py-20 text-13">Loading...</p>
-      ) : arbitrators.length === 0 ? (
-        <p className="px-24 py-20 text-13">No arbitrators on the register yet.</p>
+      ) : filtered.length === 0 ? (
+        <p className="px-24 py-20 text-13">
+          {query ? 'No arbitrators match this search.' : 'No arbitrators on the register yet.'}
+        </p>
       ) : (
-        arbitrators.map((a) => (
+        filtered.map((a) => (
           <Link
             key={a.id}
             to={`/arbitrators/${a.id}`}

@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { notifyUsers } from '../services/notify.service';
 
 /**
  * Scans ongoing assignments against their case's SLA thresholds and:
@@ -119,15 +120,7 @@ async function notifyOnce(
     });
     if (existing) continue;
 
-    await prisma.notifications.create({
-      data: {
-        user_id: userId,
-        type,
-        related_entity_type: relatedEntityType,
-        related_entity_id: relatedEntityId,
-        message,
-      },
-    });
+    await notifyUsers([Number(userId)], type, relatedEntityType, Number(relatedEntityId), message);
   }
 }
 

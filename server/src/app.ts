@@ -1,4 +1,5 @@
 import './lib/bigintJson';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
@@ -7,6 +8,7 @@ import MySQLStoreFactory from 'express-mysql-session';
 import helmet from 'helmet';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import { csrfProtection } from './middleware/csrf';
 import { routes } from './routes';
 
 const MySQLStore = MySQLStoreFactory(session);
@@ -54,6 +56,8 @@ export function createApp() {
   );
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json());
+  app.use(cookieParser());
+  app.use(csrfProtection);
 
   const sessionStore = new MySQLStore({
     host: env.DB_HOST,

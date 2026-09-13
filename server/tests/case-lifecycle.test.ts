@@ -1,8 +1,8 @@
-import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { prisma } from '../src/lib/prisma';
 import { truncateAll } from './helpers/db';
+import { csrfAgent } from './helpers/csrfAgent';
 import { createUser } from './helpers/fixtures';
 
 const app = createApp();
@@ -12,7 +12,7 @@ afterAll(() => prisma.$disconnect());
 
 async function loginAsAdmin() {
   const { user, password } = await createUser('admin');
-  const agent = request.agent(app);
+  const agent = await csrfAgent(app);
   await agent.post('/api/auth/login').send({ email: user.email, password }).expect(200);
   return agent;
 }
@@ -100,7 +100,7 @@ describe('case lifecycle (end to end through the API)', () => {
 
   it('rejects case creation for a party account (staff-only)', async () => {
     const { user, password } = await createUser('party', { email: 'party@test.local' });
-    const agent = request.agent(app);
+    const agent = await csrfAgent(app);
     await agent.post('/api/auth/login').send({ email: user.email, password }).expect(200);
 
     const res = await agent.post('/api/cases').send({

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listCases } from '../api/cases';
+import { downloadCsv } from '../lib/csv';
 import {
   arbitratorLabel,
   deadlineLine,
@@ -24,10 +25,37 @@ const FILTERS = [
 export function Cases() {
   const [cases, setCases] = useState<Case[] | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>(null);
+  const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    listCases().then(setCases);
-  }, []);
+  function reload(q?: string) {
+    listCases(q).then(setCases);
+  }
+
+  useEffect(() => reload(), []);
+
+  function handleSearch(event: FormEvent) {
+    event.preventDefault();
+    reload(query || undefined);
+  }
+
+  function handleExport() {
+    if (!cases) return;
+    downloadCsv(
+      `aak-cases-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        { header: 'Case number', value: (c: Case) => c.case_number },
+        { header: 'Status', value: (c: Case) => c.status },
+        { header: 'Category', value: (c: Case) => c.category },
+        { header: 'Dispute value', value: (c: Case) => disputeLine(c) },
+        { header: 'Claimant', value: (c: Case) => partyLine(c).claimant },
+        { header: 'Respondent', value: (c: Case) => partyLine(c).respondent },
+        { header: 'Filed at', value: (c: Case) => c.filed_at },
+        { header: 'Due date', value: (c: Case) => c.due_date ?? '' },
+        { header: 'Arbitrator', value: (c: Case) => arbitratorLabel(c) },
+      ],
+      cases,
+    );
+  }
 
   if (!cases) return <p>Loading...</p>;
 
@@ -50,6 +78,20 @@ export function Cases() {
             {cases.length} arbitration{cases.length === 1 ? '' : 's'} on the register
           </div>
         </div>
+        <form onSubmit={handleSearch} className="flex gap-8 items-center">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search case #, party, description"
+            className="w-[260px] border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+          />
+          <button type="submit" className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+            Search
+          </button>
+          <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+            Export CSV
+          </button>
+        </form>
       </div>
 
       <div className="flex flex-wrap border-b border-rule bg-band-alt">

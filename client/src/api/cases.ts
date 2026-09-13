@@ -12,8 +12,8 @@ export interface CreateCaseInput {
   parties: Array<{ partyId: number; role: 'claimant' | 'respondent' | 'other' }>;
 }
 
-export async function listCases(): Promise<Case[]> {
-  const { data } = await apiClient.get('/cases');
+export async function listCases(q?: string): Promise<Case[]> {
+  const { data } = await apiClient.get('/cases', { params: q ? { q } : undefined });
   return data;
 }
 

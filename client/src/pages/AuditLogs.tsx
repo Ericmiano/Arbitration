@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { listAuditLogs } from '../api/auditLogs';
+import { downloadCsv } from '../lib/csv';
 import { AuditLogEntry } from '../types';
 
 export function AuditLogs() {
@@ -19,15 +20,37 @@ export function AuditLogs() {
     reload({ action: action || undefined, entityType: entityType || undefined });
   }
 
+  function handleExport() {
+    if (!logs) return;
+    downloadCsv(
+      `aak-audit-log-${new Date().toISOString().slice(0, 10)}.csv`,
+      [
+        { header: 'Timestamp', value: (l: AuditLogEntry) => l.createdAt },
+        { header: 'Action', value: (l: AuditLogEntry) => l.action },
+        { header: 'Entity type', value: (l: AuditLogEntry) => l.entityType },
+        { header: 'Entity ID', value: (l: AuditLogEntry) => l.entityId },
+        { header: 'User', value: (l: AuditLogEntry) => l.userEmail ?? 'system' },
+        { header: 'IP address', value: (l: AuditLogEntry) => l.ipAddress ?? '' },
+        { header: 'Metadata', value: (l: AuditLogEntry) => (l.metadata ? JSON.stringify(l.metadata) : '') },
+      ],
+      logs,
+    );
+  }
+
   if (!logs) return <p>Loading...</p>;
 
   return (
     <div className="bg-sheet border border-ink">
-      <div className="px-24 pt-22 pb-18 border-b border-ink">
-        <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Audit log</h1>
-        <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
-          {logs.length} event{logs.length === 1 ? '' : 's'} · most recent 500
+      <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-16 gap-y-10 items-end">
+        <div className="flex-1 min-w-[200px]">
+          <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Audit log</h1>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
+            {logs.length} event{logs.length === 1 ? '' : 's'} · most recent 500
+          </div>
         </div>
+        <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+          Export CSV
+        </button>
       </div>
 
       <form onSubmit={handleFilter} className="px-24 py-14 border-b border-rule bg-band-alt flex flex-wrap gap-8 items-center">

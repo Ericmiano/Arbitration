@@ -10,6 +10,7 @@ import { notificationRoutes } from './notifications.routes';
 import { organizationRoutes } from './organizations.routes';
 import { partyRoutes } from './parties.routes';
 import { projectRoutes } from './projects.routes';
+import { reportRoutes } from './reports.routes';
 import { userRoutes } from './users.routes';
 
 export const routes = Router();
@@ -27,4 +28,5 @@ routes.use('/notifications', notificationRoutes);
 routes.use('/organizations', organizationRoutes);
 routes.use('/parties', partyRoutes);
 routes.use('/projects', projectRoutes);
+routes.use('/reports', reportRoutes);
 routes.use('/users', userRoutes);

@@ -1,8 +1,8 @@
-import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import { prisma } from '../src/lib/prisma';
 import { truncateAll } from './helpers/db';
+import { csrfAgent } from './helpers/csrfAgent';
 import { createArbitrator, createCase, createParty, createUser } from './helpers/fixtures';
 
 const app = createApp();
@@ -11,7 +11,7 @@ beforeEach(truncateAll);
 afterAll(() => prisma.$disconnect());
 
 async function agentFor(user: { email: string }, password: string) {
-  const agent = request.agent(app);
+  const agent = await csrfAgent(app);
   await agent.post('/api/auth/login').send({ email: user.email, password }).expect(200);
   return agent;
 }

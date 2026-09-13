@@ -30,13 +30,33 @@ const caseSummaryInclude: Prisma.casesInclude = {
   projects: { select: { id: true, name: true, location: true } },
 };
 
+/**
+ * Free-text search across case number, description, and party names. Kept
+ * as a simple `contains` scan rather than a search index - at this system's
+ * scale (a few hundred cases, not millions) a full-text engine would be
+ * solving a problem that doesn't exist yet.
+ */
+function searchCondition(q: string | undefined): Prisma.casesWhereInput | undefined {
+  if (!q) return undefined;
+  return {
+    OR: [
+      { case_number: { contains: q } },
+      { description: { contains: q } },
+      { case_parties: { some: { parties: { full_name: { contains: q } } } } },
+    ],
+  };
+}
+
 /** Cases visible to the current session user, scoped by role. */
 caseRoutes.get('/', async (req, res, next) => {
   try {
     const sessionUser = req.session.user!;
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 200) : undefined;
+    const search = searchCondition(q);
 
     if (sessionUser.role === 'admin' || sessionUser.role === 'registrar' || sessionUser.role === 'staff') {
       const cases = await prisma.cases.findMany({
+        where: search,
         include: caseSummaryInclude,
         orderBy: { filed_at: 'desc' },
         take: LIST_HARD_CAP,
@@ -52,7 +72,7 @@ caseRoutes.get('/', async (req, res, next) => {
         return;
       }
       const cases = await prisma.cases.findMany({
-        where: { assignments: { some: { arbitrator_id: arbitrator.id } } },
+        where: { AND: [{ assignments: { some: { arbitrator_id: arbitrator.id } } }, search ?? {}] },
         include: caseSummaryInclude,
         orderBy: { filed_at: 'desc' },
         take: LIST_HARD_CAP,
@@ -63,7 +83,7 @@ caseRoutes.get('/', async (req, res, next) => {
 
     // role === 'party'
     const cases = await prisma.cases.findMany({
-      where: { case_parties: { some: { parties: { user_id: sessionUser.id } } } },
+      where: { AND: [{ case_parties: { some: { parties: { user_id: sessionUser.id } } } }, search ?? {}] },
       include: caseSummaryInclude,
       orderBy: { filed_at: 'desc' },
       take: LIST_HARD_CAP,

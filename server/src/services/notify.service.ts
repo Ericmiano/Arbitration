@@ -1,3 +1,4 @@
+import { sendMail } from '../lib/mail';
 import { prisma } from '../lib/prisma';
 
 /**
@@ -23,6 +24,11 @@ export async function caseParticipantUserIds(caseId: number): Promise<number[]> 
   return [...userIds];
 }
 
+/**
+ * Writes the in-app notification (always) and best-effort emails everyone
+ * notified (never lets a mail failure break the action that triggered it -
+ * a hearing still gets scheduled even if SMTP is down).
+ */
 export async function notifyUsers(
   userIds: number[],
   type: string,
@@ -31,6 +37,7 @@ export async function notifyUsers(
   message: string,
 ): Promise<void> {
   if (userIds.length === 0) return;
+
   await prisma.notifications.createMany({
     data: userIds.map((userId) => ({
       user_id: userId,
@@ -40,4 +47,19 @@ export async function notifyUsers(
       message,
     })),
   });
+
+  const recipients = await prisma.users.findMany({
+    where: { id: { in: userIds }, status: 'active' },
+    select: { email: true },
+  });
+
+  await Promise.all(
+    recipients.map((recipient) =>
+      sendMail({
+        to: recipient.email,
+        subject: `AAK Arbitration Register - ${type.replace(/_/g, ' ')}`,
+        text: message,
+      }).catch((error) => console.error(`Failed to email notification to ${recipient.email}:`, error)),
+    ),
+  );
 }
