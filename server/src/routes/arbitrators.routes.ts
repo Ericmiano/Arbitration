@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
+import { idSchema } from '../lib/zodId';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { checkConflicts } from '../services/conflict.service';
 
@@ -107,6 +110,7 @@ arbitratorRoutes.get('/', requireRole('admin', 'registrar', 'staff'), async (_re
         },
       },
       orderBy: { score: 'desc' },
+      take: LIST_HARD_CAP,
     });
     res.json(arbitrators);
   } catch (error) {
@@ -115,7 +119,7 @@ arbitratorRoutes.get('/', requireRole('admin', 'registrar', 'staff'), async (_re
 });
 
 const eligibleQuerySchema = z.object({
-  caseId: z.coerce.number().int().positive(),
+  caseId: idSchema,
 });
 
 /**
@@ -168,8 +172,8 @@ arbitratorRoutes.get('/eligible', requireRole('admin', 'registrar', 'staff'), as
 
 const declareConflictSchema = z
   .object({
-    partyId: z.coerce.number().int().positive().optional(),
-    organizationId: z.coerce.number().int().positive().optional(),
+    partyId: idSchema.optional(),
+    organizationId: idSchema.optional(),
     reason: z.string().min(1).max(500),
     expiresAt: z.coerce.date().optional(),
   })
@@ -182,9 +186,9 @@ arbitratorRoutes.post(
   requireRole('admin', 'registrar'),
   async (req, res, next) => {
     try {
-      const arbitratorId = Number(req.params.arbitratorId);
+      const arbitratorId = parseId(req.params.arbitratorId);
       const parseResult = declareConflictSchema.safeParse(req.body);
-      if (!Number.isInteger(arbitratorId) || !parseResult.success) {
+      if (arbitratorId === null || !parseResult.success) {
         res.status(400).json({ error: 'Invalid request' });
         return;
       }
@@ -212,8 +216,8 @@ arbitratorRoutes.post(
 // pattern matches any single path segment.
 arbitratorRoutes.get('/:arbitratorId', requireRole('admin', 'registrar', 'staff'), async (req, res, next) => {
   try {
-    const arbitratorId = Number(req.params.arbitratorId);
-    if (!Number.isInteger(arbitratorId)) {
+    const arbitratorId = parseId(req.params.arbitratorId);
+    if (arbitratorId === null) {
       res.status(400).json({ error: 'Invalid arbitrator id' });
       return;
     }

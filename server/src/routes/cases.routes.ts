@@ -2,11 +2,14 @@ import { Prisma } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { logAudit } from '../services/audit.service';
 import { canAccessCase, SessionUser } from '../services/caseAccess.service';
 import { generateCaseNumber } from '../services/caseNumber.service';
 import { deriveSlaTier } from '../services/sla.service';
+import { idSchema } from '../lib/zodId';
 
 export const caseRoutes = Router();
 
@@ -36,6 +39,7 @@ caseRoutes.get('/', async (req, res, next) => {
       const cases = await prisma.cases.findMany({
         include: caseSummaryInclude,
         orderBy: { filed_at: 'desc' },
+        take: LIST_HARD_CAP,
       });
       res.json(cases);
       return;
@@ -51,6 +55,7 @@ caseRoutes.get('/', async (req, res, next) => {
         where: { assignments: { some: { arbitrator_id: arbitrator.id } } },
         include: caseSummaryInclude,
         orderBy: { filed_at: 'desc' },
+        take: LIST_HARD_CAP,
       });
       res.json(cases);
       return;
@@ -61,6 +66,7 @@ caseRoutes.get('/', async (req, res, next) => {
       where: { case_parties: { some: { parties: { user_id: sessionUser.id } } } },
       include: caseSummaryInclude,
       orderBy: { filed_at: 'desc' },
+      take: LIST_HARD_CAP,
     });
     res.json(cases);
   } catch (error) {
@@ -69,8 +75,8 @@ caseRoutes.get('/', async (req, res, next) => {
 });
 
 const createCaseSchema = z.object({
-  projectId: z.coerce.number().int().positive().optional(),
-  contractId: z.coerce.number().int().positive().optional(),
+  projectId: idSchema.optional(),
+  contractId: idSchema.optional(),
   disputeValue: z.coerce.number().positive(),
   currency: z.string().length(3).default('KES'),
   category: z.string().min(1).max(100),
@@ -79,7 +85,7 @@ const createCaseSchema = z.object({
   parties: z
     .array(
       z.object({
-        partyId: z.coerce.number().int().positive(),
+        partyId: idSchema,
         role: z.enum(['claimant', 'respondent', 'other']),
       }),
     )
@@ -168,9 +174,9 @@ caseRoutes.patch(
   requireRole('admin', 'registrar', 'staff'),
   async (req, res, next) => {
     try {
-      const caseId = Number(req.params.caseId);
+      const caseId = parseId(req.params.caseId);
       const parseResult = confirmAgreementSchema.safeParse(req.body);
-      if (!Number.isInteger(caseId) || !parseResult.success) {
+      if (caseId === null || !parseResult.success) {
         res.status(400).json({ error: 'Invalid case id or documentPublicId' });
         return;
       }
@@ -220,8 +226,8 @@ caseRoutes.patch(
 
 caseRoutes.get('/:caseId', async (req, res, next) => {
   try {
-    const caseId = Number(req.params.caseId);
-    if (!Number.isInteger(caseId)) {
+    const caseId = parseId(req.params.caseId);
+    if (caseId === null) {
       res.status(400).json({ error: 'Invalid case id' });
       return;
     }

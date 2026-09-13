@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 export function Settings() {
   const { user } = useAuth();
+  const isStaff = user?.role === 'admin' || user?.role === 'registrar' || user?.role === 'staff';
   const [nameError, setNameError] = useState<string | null>(null);
   const [nameSaved, setNameSaved] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
@@ -46,18 +47,27 @@ export function Settings() {
 
       <div className="px-24 py-20 border-b border-rule max-w-[420px]">
         <div className="font-mono text-9.5 tracking-[0.12em] text-muted">DISPLAY NAME</div>
-        <form onSubmit={handleNameSubmit} className="mt-10 flex gap-10 items-end">
-          <input
-            name="fullName"
-            defaultValue={user?.fullName}
-            className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
-          />
-          <button type="submit" className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
-            Save
-          </button>
-        </form>
-        {nameSaved && <p className="mt-8 text-12.5 text-green">Saved.</p>}
-        {nameError && <p className="mt-8 text-12.5 text-red">{nameError}</p>}
+        {isStaff ? (
+          <>
+            <form onSubmit={handleNameSubmit} className="mt-10 flex gap-10 items-end">
+              <input
+                name="fullName"
+                defaultValue={user?.fullName}
+                className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+              />
+              <button type="submit" className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+                Save
+              </button>
+            </form>
+            {nameSaved && <p className="mt-8 text-12.5 text-green">Saved.</p>}
+            {nameError && <p className="mt-8 text-12.5 text-red">{nameError}</p>}
+          </>
+        ) : (
+          <p className="mt-10 text-13 text-ink-2">
+            {user?.fullName} - {user?.role === 'arbitrator' ? 'managed via your arbitrator profile' : 'managed via your party record'},
+            not editable here.
+          </p>
+        )}
       </div>
 
       <div className="px-24 py-20 border-b border-rule max-w-[420px]">

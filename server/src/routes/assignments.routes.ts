@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
+import { idSchema } from '../lib/zodId';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { logAudit } from '../services/audit.service';
 import { recalculateArbitratorScore } from '../services/scoring.service';
@@ -12,8 +14,8 @@ export const assignmentRoutes = Router();
 assignmentRoutes.use(requireAuth);
 
 const createAssignmentSchema = z.object({
-  caseId: z.coerce.number().int().positive(),
-  arbitratorId: z.coerce.number().int().positive(),
+  caseId: idSchema,
+  arbitratorId: idSchema,
 });
 
 assignmentRoutes.post('/', requireRole('admin', 'registrar', 'staff'), async (req, res, next) => {
@@ -90,9 +92,9 @@ const requestExtensionSchema = z.object({
 
 assignmentRoutes.post('/:assignmentId/extensions', async (req, res, next) => {
   try {
-    const assignmentId = Number(req.params.assignmentId);
+    const assignmentId = parseId(req.params.assignmentId);
     const parseResult = requestExtensionSchema.safeParse(req.body);
-    if (!Number.isInteger(assignmentId) || !parseResult.success) {
+    if (assignmentId === null || !parseResult.success) {
       res.status(400).json({ error: 'reason and requestedDueDate are required' });
       return;
     }
@@ -133,8 +135,8 @@ assignmentRoutes.post('/:assignmentId/extensions', async (req, res, next) => {
 
 assignmentRoutes.get('/:assignmentId/extensions', async (req, res, next) => {
   try {
-    const assignmentId = Number(req.params.assignmentId);
-    if (!Number.isInteger(assignmentId)) {
+    const assignmentId = parseId(req.params.assignmentId);
+    if (assignmentId === null) {
       res.status(400).json({ error: 'Invalid assignment id' });
       return;
     }
@@ -177,9 +179,9 @@ assignmentRoutes.patch(
   requireRole('admin', 'registrar', 'staff'),
   async (req, res, next) => {
     try {
-      const extensionId = Number(req.params.extensionId);
+      const extensionId = parseId(req.params.extensionId);
       const parseResult = decideExtensionSchema.safeParse(req.body);
-      if (!Number.isInteger(extensionId) || !parseResult.success) {
+      if (extensionId === null || !parseResult.success) {
         res.status(400).json({ error: 'decision must be "approved" or "rejected"' });
         return;
       }
@@ -231,9 +233,9 @@ const completeAssignmentSchema = z.object({
 
 assignmentRoutes.post('/:assignmentId/complete', async (req, res, next) => {
   try {
-    const assignmentId = Number(req.params.assignmentId);
+    const assignmentId = parseId(req.params.assignmentId);
     const parseResult = completeAssignmentSchema.safeParse(req.body);
-    if (!Number.isInteger(assignmentId) || !parseResult.success) {
+    if (assignmentId === null || !parseResult.success) {
       res.status(400).json({ error: 'A valid outcome is required' });
       return;
     }
@@ -307,9 +309,9 @@ assignmentRoutes.post(
   requireRole('admin', 'registrar', 'staff'),
   async (req, res, next) => {
     try {
-      const assignmentId = Number(req.params.assignmentId);
+      const assignmentId = parseId(req.params.assignmentId);
       const parseResult = withdrawSchema.safeParse(req.body);
-      if (!Number.isInteger(assignmentId) || !parseResult.success) {
+      if (assignmentId === null || !parseResult.success) {
         res.status(400).json({ error: 'reason is required' });
         return;
       }

@@ -41,11 +41,22 @@ authRoutes.post('/login', loginLimiter, async (req, res, next) => {
     const invalidCredentials = () => res.status(401).json({ error: 'Invalid email or password' });
 
     if (!user) {
+      // Deliberately not audited against a specific user record - there is
+      // none to attribute it to, and logging the attempted email here would
+      // itself accumulate a list of guessed addresses. The rate limiter is
+      // the control for this case, not the audit log.
       invalidCredentials();
       return;
     }
 
     if (user.locked_until && user.locked_until.getTime() > Date.now()) {
+      await logAudit({
+        userId: Number(user.id),
+        action: 'login_blocked_locked_account',
+        entityType: 'user',
+        entityId: user.id,
+        ipAddress: req.ip,
+      });
       res.status(423).json({ error: 'Account temporarily locked. Try again later.' });
       return;
     }
@@ -66,6 +77,14 @@ authRoutes.post('/login', loginLimiter, async (req, res, next) => {
           failed_login_count: lockingOut ? 0 : failedCount,
           locked_until: lockingOut ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000) : null,
         },
+      });
+      await logAudit({
+        userId: Number(user.id),
+        action: lockingOut ? 'login_failed_account_locked' : 'login_failed',
+        entityType: 'user',
+        entityId: user.id,
+        metadata: { failedCount },
+        ipAddress: req.ip,
       });
       invalidCredentials();
       return;
@@ -164,15 +183,23 @@ const updateProfileSchema = z.object({
 });
 
 /**
- * Self-service display-name update. Only meaningfully affects staff/admin/
- * registrar accounts - arbitrators and parties display their arbitrators/
- * parties.full_name instead (see resolveDisplayName), which is managed
- * through the arbitrator/party records, not here.
+ * Self-service display-name update. Staff/admin/registrar only - arbitrators
+ * and parties display their arbitrators/parties.full_name instead (see
+ * resolveDisplayName), managed through those records, not this endpoint.
+ * A prior version accepted this from any role: it silently updated
+ * users.full_name with no visible effect, since resolveDisplayName never
+ * reads it for those roles - confusing UX, now rejected outright instead.
  */
 authRoutes.patch('/profile', async (req, res, next) => {
   try {
     if (!req.session.user) {
       res.status(401).json({ error: 'Not authenticated' });
+      return;
+    }
+    if (!['admin', 'registrar', 'staff'].includes(req.session.user.role)) {
+      res.status(403).json({
+        error: 'Your display name is managed through your arbitrator/party record, not here.',
+      });
       return;
     }
     const parseResult = updateProfileSchema.safeParse(req.body);

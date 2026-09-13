@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
+import { idSchema } from '../lib/zodId';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 
 export const projectRoutes = Router();
@@ -12,6 +15,7 @@ projectRoutes.get('/', async (_req, res, next) => {
     const projects = await prisma.projects.findMany({
       include: { contracts: { select: { id: true, reference_number: true, has_arbitration_clause: true } } },
       orderBy: { name: 'asc' },
+      take: LIST_HARD_CAP,
     });
     res.json(projects);
   } catch (error) {
@@ -43,7 +47,7 @@ projectRoutes.post('/', async (req, res, next) => {
 });
 
 const createContractSchema = z.object({
-  projectId: z.coerce.number().int().positive(),
+  projectId: idSchema,
   referenceNumber: z.string().max(150).optional(),
   executionDate: z.coerce.date().optional(),
   value: z.coerce.number().positive().optional(),
@@ -51,16 +55,18 @@ const createContractSchema = z.object({
   hasArbitrationClause: z.boolean().default(false),
   arbitrationClauseText: z.string().optional(),
   governingLaw: z.string().max(150).optional(),
-  parties: z
-    .array(z.object({ partyId: z.coerce.number().int().positive(), role: z.string().min(1).max(100) }))
-    .min(2),
+  parties: z.array(z.object({ partyId: idSchema, role: z.string().min(1).max(100) })).min(2),
 });
 
 projectRoutes.post('/:projectId/contracts', async (req, res, next) => {
   try {
-    const projectId = Number(req.params.projectId);
+    const projectId = parseId(req.params.projectId);
+    if (projectId === null) {
+      res.status(400).json({ error: 'Invalid project id' });
+      return;
+    }
     const parseResult = createContractSchema.safeParse({ ...req.body, projectId });
-    if (!Number.isInteger(projectId) || !parseResult.success) {
+    if (!parseResult.success) {
       res.status(400).json({ error: 'Invalid request' });
       return;
     }

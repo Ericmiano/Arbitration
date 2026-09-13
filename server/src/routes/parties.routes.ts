@@ -3,6 +3,9 @@ import bcrypt from 'bcryptjs';
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
+import { idSchema } from '../lib/zodId';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 
 export const partyRoutes = Router();
@@ -14,6 +17,7 @@ partyRoutes.get('/', async (_req, res, next) => {
     const parties = await prisma.parties.findMany({
       include: { organizations: { select: { id: true, name: true } } },
       orderBy: { full_name: 'asc' },
+      take: LIST_HARD_CAP,
     });
     res.json(parties);
   } catch (error) {
@@ -23,7 +27,7 @@ partyRoutes.get('/', async (_req, res, next) => {
 
 const createPartySchema = z.object({
   type: z.enum(['individual', 'organization']),
-  organizationId: z.coerce.number().int().positive().optional(),
+  organizationId: idSchema.optional(),
   fullName: z.string().min(1).max(255),
   email: z.string().email().optional(),
   phone: z.string().max(50).optional(),
@@ -78,9 +82,9 @@ const inviteSchema = z.object({
  */
 partyRoutes.post('/:partyId/invite', async (req, res, next) => {
   try {
-    const partyId = Number(req.params.partyId);
+    const partyId = parseId(req.params.partyId);
     const parseResult = inviteSchema.safeParse(req.body);
-    if (!Number.isInteger(partyId) || !parseResult.success) {
+    if (partyId === null || !parseResult.success) {
       res.status(400).json({ error: 'A valid email is required' });
       return;
     }

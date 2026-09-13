@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { parseId } from '../lib/parseId';
 import { requireAuth } from '../middleware/auth';
 
 export const notificationRoutes = Router();
@@ -21,8 +22,8 @@ notificationRoutes.get('/', async (req, res, next) => {
 
 notificationRoutes.patch('/:notificationId/read', async (req, res, next) => {
   try {
-    const notificationId = Number(req.params.notificationId);
-    if (!Number.isInteger(notificationId)) {
+    const notificationId = parseId(req.params.notificationId);
+    if (notificationId === null) {
       res.status(400).json({ error: 'Invalid notification id' });
       return;
     }

@@ -9,13 +9,15 @@ import { requireAuth } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { logAudit } from '../services/audit.service';
 import { canAccessCase } from '../services/caseAccess.service';
+import { idSchema } from '../lib/zodId';
+import { LIST_HARD_CAP } from '../lib/pagination';
 
 export const documentRoutes = Router();
 
 documentRoutes.use(requireAuth);
 
 const uploadMetadataSchema = z.object({
-  caseId: z.coerce.number().int().positive(),
+  caseId: idSchema,
   documentType: z.enum([
     'contract_copy',
     'evidence',
@@ -96,7 +98,7 @@ documentRoutes.post('/', upload.single('file'), async (req, res, next) => {
 });
 
 const listQuerySchema = z.object({
-  caseId: z.coerce.number().int().positive().optional(),
+  caseId: idSchema.optional(),
 });
 
 /**
@@ -131,6 +133,7 @@ documentRoutes.get('/', async (req, res, next) => {
       where: { case_id: { in: caseIds } },
       include: { cases_documents_case_idTocases: { select: { id: true, case_number: true } } },
       orderBy: { created_at: 'desc' },
+      take: LIST_HARD_CAP,
     });
 
     const visible = await Promise.all(

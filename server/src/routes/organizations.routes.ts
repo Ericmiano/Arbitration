@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 
 export const organizationRoutes = Router();
@@ -9,7 +10,10 @@ organizationRoutes.use(requireAuth);
 
 organizationRoutes.get('/', async (_req, res, next) => {
   try {
-    const organizations = await prisma.organizations.findMany({ orderBy: { name: 'asc' } });
+    const organizations = await prisma.organizations.findMany({
+      orderBy: { name: 'asc' },
+      take: LIST_HARD_CAP,
+    });
     res.json(organizations);
   } catch (error) {
     next(error);

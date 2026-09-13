@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../lib/prisma';
+import { LIST_HARD_CAP } from '../lib/pagination';
 import { requireAuth, requireRole } from '../middleware/auth';
 import { resolveDisplayName } from '../services/userProfile.service';
 
@@ -12,6 +13,7 @@ userRoutes.get('/', async (_req, res, next) => {
     const users = await prisma.users.findMany({
       select: { id: true, email: true, role: true, status: true, full_name: true, last_login_at: true, created_at: true },
       orderBy: { created_at: 'desc' },
+      take: LIST_HARD_CAP,
     });
 
     const withNames = await Promise.all(
