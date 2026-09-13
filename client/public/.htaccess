@@ -1,0 +1,33 @@
+# Deployed alongside client/dist/ to public_html (or the SPA's document
+# root) on cPanel. Vite copies everything in client/public/ into dist/ as-is,
+# so this file lands next to index.html automatically on build.
+
+<IfModule mod_headers.c>
+  # This is a same-origin SPA shell with no third-party scripts, styles, or
+  # fonts (IBM Plex is self-hosted under /fonts) - so the policy can be
+  # locked to "this origin only" rather than allow-listing external hosts.
+  # connect-src must include the API's real origin if it's deployed on a
+  # separate subdomain from this SPA (see CORS_ORIGIN in the API's .env) -
+  # replace REPLACE_WITH_API_ORIGIN below before deploying, e.g.
+  # https://api.yourdomain.org. If the API is reverse-proxied under the same
+  # origin as this SPA (e.g. /api), drop the second connect-src value.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' REPLACE_WITH_API_ORIGIN; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  # Only takes effect once served over HTTPS (AutoSSL) - browsers ignore it
+  # over plain HTTP, so it's safe to leave on even before the cert exists.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # React Router client-side routes (e.g. /cases/42) have no matching file
+  # on disk - without this, Apache 404s on refresh or a direct link to any
+  # route other than "/". Real files and the SPA's own asset requests pass
+  # through untouched; everything else falls back to index.html.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

@@ -25,7 +25,33 @@ export function createApp() {
     app.set('trust proxy', 1);
   }
 
-  app.use(helmet());
+  // This API only ever serves JSON and file downloads (never renders HTML
+  // itself), so every directive is locked to 'none' explicitly rather than
+  // taking helmet's built-in defaults (useDefaults: false) - those defaults
+  // assume a server that also serves a page (script-src 'self', style-src
+  // with 'unsafe-inline', font-src https:, etc.), none of which this API
+  // needs or should allow.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          defaultSrc: ["'none'"],
+          scriptSrc: ["'none'"],
+          styleSrc: ["'none'"],
+          imgSrc: ["'none'"],
+          fontSrc: ["'none'"],
+          objectSrc: ["'none'"],
+          connectSrc: ["'none'"],
+          frameAncestors: ["'none'"],
+          baseUri: ["'none'"],
+          formAction: ["'none'"],
+        },
+      },
+      crossOriginResourcePolicy: { policy: 'same-site' },
+      hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+    }),
+  );
   app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }));
   app.use(express.json());
 
