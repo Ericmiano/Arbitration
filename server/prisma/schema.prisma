@@ -60,7 +60,6 @@ model arbitrators {
   phone                      String?                      @db.VarChar(50)
   bio                        String?                      @db.Text
   adr_experience_notes       String?                      @db.Text
-  credentials                String?                      @db.Text
   status                     arbitrators_status           @default(active)
   score                      Decimal                      @default(70.00) @db.Decimal(5, 2)
   cases_closed_count         Int                          @default(0) @db.UnsignedInt
