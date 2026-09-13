@@ -138,6 +138,30 @@ export interface DocumentSummary {
   caseNumber?: string;
 }
 
+export interface Hearing {
+  id: string;
+  case_id: string;
+  scheduled_at: string;
+  mode: 'in_person' | 'virtual';
+  venue_or_link: string;
+  agenda: string | null;
+  required_documents: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'postponed';
+  cases: { id: string; case_number: string };
+}
+
+export interface AuditLogEntry {
+  id: string;
+  userEmail: string | null;
+  userRole: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  metadata: unknown;
+  ipAddress: string | null;
+  createdAt: string;
+}
+
 export interface AppNotification {
   id: string;
   type: string;

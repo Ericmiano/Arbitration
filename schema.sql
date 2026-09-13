@@ -36,6 +36,23 @@ CREATE TABLE users (
     UNIQUE KEY uq_users_public_id (public_id)
 ) ENGINE=InnoDB;
 
+-- One-time, single-use tokens for self-service password recovery. Only a
+-- SHA-256 hash of the token is stored - the raw token exists only in the
+-- emailed link, briefly, so a database read alone can never yield a working
+-- reset link.
+CREATE TABLE password_reset_tokens (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id             BIGINT UNSIGNED NOT NULL,
+    token_hash          CHAR(64) NOT NULL,
+    expires_at          DATETIME NOT NULL,
+    used_at             DATETIME NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_password_reset_token_hash (token_hash),
+    CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_password_reset_user ON password_reset_tokens(user_id);
+
 -- ============================================================
 -- ORGANIZATIONS & PARTIES
 -- ============================================================
@@ -312,6 +329,29 @@ CREATE TABLE assignment_extensions (
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_extensions_assignment ON assignment_extensions(assignment_id);
+
+-- ============================================================
+-- HEARINGS
+-- ============================================================
+
+CREATE TABLE hearings (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    case_id             BIGINT UNSIGNED NOT NULL,
+    scheduled_at        DATETIME NOT NULL,
+    mode                ENUM('in_person', 'virtual') NOT NULL DEFAULT 'in_person',
+    venue_or_link       VARCHAR(500) NOT NULL,               -- physical venue address, or a meeting link
+    agenda              TEXT NULL,
+    required_documents  TEXT NULL,                           -- papers required beforehand, free text
+    status              ENUM('scheduled', 'completed', 'cancelled', 'postponed') NOT NULL DEFAULT 'scheduled',
+    scheduled_by        BIGINT UNSIGNED NOT NULL,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_hearings_case FOREIGN KEY (case_id) REFERENCES cases(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_hearings_scheduler FOREIGN KEY (scheduled_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+CREATE INDEX idx_hearings_case ON hearings(case_id);
+CREATE INDEX idx_hearings_scheduled_at ON hearings(scheduled_at);
 
 -- ============================================================
 -- DOCUMENTS

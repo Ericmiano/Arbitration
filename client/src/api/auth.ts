@@ -29,3 +29,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
 export async function updateProfile(fullName: string): Promise<void> {
   await apiClient.patch('/auth/profile', { fullName });
 }
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  await apiClient.post('/auth/request-password-reset', { email });
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  await apiClient.post('/auth/reset-password', { token, newPassword });
+}

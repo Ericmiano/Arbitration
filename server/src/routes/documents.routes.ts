@@ -8,7 +8,7 @@ import { prisma } from '../lib/prisma';
 import { requireAuth } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import { logAudit } from '../services/audit.service';
-import { canAccessCase } from '../services/caseAccess.service';
+import { accessibleCaseIds, canAccessCase } from '../services/caseAccess.service';
 import { idSchema } from '../lib/zodId';
 import { LIST_HARD_CAP } from '../lib/pagination';
 
@@ -162,30 +162,6 @@ documentRoutes.get('/', async (req, res, next) => {
     next(error);
   }
 });
-
-async function accessibleCaseIds(sessionUser: { id: number; role: string }): Promise<number[]> {
-  if (['admin', 'registrar', 'staff'].includes(sessionUser.role)) {
-    const all = await prisma.cases.findMany({ select: { id: true } });
-    return all.map((c) => Number(c.id));
-  }
-
-  if (sessionUser.role === 'arbitrator') {
-    const arbitrator = await prisma.arbitrators.findUnique({ where: { user_id: sessionUser.id } });
-    if (!arbitrator) return [];
-    const assignments = await prisma.assignments.findMany({
-      where: { arbitrator_id: arbitrator.id },
-      select: { case_id: true },
-    });
-    return [...new Set(assignments.map((a) => Number(a.case_id)))];
-  }
-
-  // role === 'party'
-  const memberships = await prisma.case_parties.findMany({
-    where: { parties: { user_id: sessionUser.id } },
-    select: { case_id: true },
-  });
-  return [...new Set(memberships.map((m) => Number(m.case_id)))];
-}
 
 async function canViewDocument(
   document: { case_id: bigint; visibility: string; uploaded_by: bigint; id: bigint },

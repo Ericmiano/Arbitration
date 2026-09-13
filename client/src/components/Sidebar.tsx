@@ -69,6 +69,7 @@ export function Sidebar() {
   const secondary: NavItem[] = isStaff
     ? [
         { to: '/users', label: 'Users' },
+        ...(user?.role === 'admin' ? [{ to: '/audit-log', label: 'Audit log' }] : []),
         { to: '/settings', label: 'Settings' },
       ]
     : [{ to: '/settings', label: 'Profile' }];

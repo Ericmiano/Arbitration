@@ -177,6 +177,7 @@ model cases {
   projects                                               projects?                  @relation(fields: [project_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "fk_cases_project")
   documents_cases_submission_agreement_doc_idTodocuments documents?                 @relation("cases_submission_agreement_doc_idTodocuments", fields: [submission_agreement_doc_id], references: [id], onUpdate: Restrict, map: "fk_cases_submission_doc")
   documents_documents_case_idTocases                     documents[]                @relation("documents_case_idTocases")
+  hearings                                               hearings[]
 
   @@index([created_by], map: "fk_cases_creator")
   @@index([submission_agreement_doc_id], map: "fk_cases_submission_doc")
@@ -349,8 +350,10 @@ model users {
   cases                                                           cases[]
   document_shares                                                 document_shares[]
   documents                                                       documents[]
+  hearings                                                        hearings[]
   notifications                                                   notifications[]
   parties                                                         parties[]
+  password_reset_tokens                                           password_reset_tokens[]
 }
 
 model sessions {
@@ -376,6 +379,38 @@ model arbitrator_registrations {
   arbitrators         arbitrators @relation(fields: [arbitrator_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_arb_reg_arbitrator")
 
   @@index([arbitrator_id], map: "idx_arb_reg_arbitrator")
+}
+
+model hearings {
+  id                 BigInt          @id @default(autoincrement()) @db.UnsignedBigInt
+  case_id            BigInt          @db.UnsignedBigInt
+  scheduled_at       DateTime        @db.DateTime(0)
+  mode               hearings_mode   @default(in_person)
+  venue_or_link      String          @db.VarChar(500)
+  agenda             String?         @db.Text
+  required_documents String?         @db.Text
+  status             hearings_status @default(scheduled)
+  scheduled_by       BigInt          @db.UnsignedBigInt
+  created_at         DateTime        @default(now()) @db.DateTime(0)
+  updated_at         DateTime        @default(now()) @db.DateTime(0)
+  cases              cases           @relation(fields: [case_id], references: [id], onUpdate: Restrict, map: "fk_hearings_case")
+  users              users           @relation(fields: [scheduled_by], references: [id], onUpdate: Restrict, map: "fk_hearings_scheduler")
+
+  @@index([scheduled_by], map: "fk_hearings_scheduler")
+  @@index([case_id], map: "idx_hearings_case")
+  @@index([scheduled_at], map: "idx_hearings_scheduled_at")
+}
+
+model password_reset_tokens {
+  id         BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  user_id    BigInt    @db.UnsignedBigInt
+  token_hash String    @unique(map: "uq_password_reset_token_hash") @db.Char(64)
+  expires_at DateTime  @db.DateTime(0)
+  used_at    DateTime? @db.DateTime(0)
+  created_at DateTime  @default(now()) @db.DateTime(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_reset_user")
+
+  @@index([user_id], map: "idx_password_reset_user")
 }
 
 enum sla_config_tier {
@@ -478,4 +513,16 @@ enum cases_outcome {
   award_issued
   settled
   withdrawn
+}
+
+enum hearings_mode {
+  in_person
+  virtual
+}
+
+enum hearings_status {
+  scheduled
+  completed
+  cancelled
+  postponed
 }

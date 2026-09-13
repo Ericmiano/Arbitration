@@ -5,6 +5,8 @@ import { prisma } from '../../src/lib/prisma';
 const TABLES = [
   'notifications',
   'audit_logs',
+  'password_reset_tokens',
+  'hearings',
   'assignment_extensions',
   'assignments',
   'document_shares',

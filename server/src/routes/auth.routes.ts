@@ -1,7 +1,10 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
+import { env } from '../config/env';
+import { sendMail } from '../lib/mail';
 import { prisma } from '../lib/prisma';
 import { logAudit } from '../services/audit.service';
 import { resolveDisplayName } from '../services/userProfile.service';
@@ -107,6 +110,121 @@ authRoutes.post('/login', loginLimiter, async (req, res, next) => {
 
     const fullName = await resolveDisplayName(Number(user.id), user.role, user.email);
     res.json({ id: user.public_id, email: user.email, role: user.role, fullName });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Shared with both reset endpoints: limits how many reset emails/attempts an
+// IP can trigger, independent of the login limiter above. Relaxed in tests
+// the same way the general API limiter is - otherwise every test in this
+// file would share one 5-request budget, since the limiter's counter lives
+// on the single `app` instance each test file creates once.
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.NODE_ENV === 'test' ? 100_000 : 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const requestResetSchema = z.object({
+  email: z.string().email(),
+});
+
+authRoutes.post('/request-password-reset', passwordResetLimiter, async (req, res, next) => {
+  try {
+    const parseResult = requestResetSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({ error: 'A valid email is required' });
+      return;
+    }
+    const { email } = parseResult.data;
+
+    // Same response whether or not the account exists, and whether or not
+    // sending actually succeeds - same enumeration reasoning as login.
+    const genericResponse = () =>
+      res.json({ message: 'If that email is registered, a reset link has been sent.' });
+
+    const user = await prisma.users.findUnique({ where: { email } });
+    if (!user || user.status !== 'active') {
+      genericResponse();
+      return;
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    await prisma.password_reset_tokens.create({
+      data: { user_id: user.id, token_hash: tokenHash, expires_at: expiresAt },
+    });
+
+    const resetUrl = `${env.CORS_ORIGIN}/reset-password?token=${token}`;
+    await sendMail({
+      to: user.email,
+      subject: 'AAK Arbitration Register - password reset',
+      text: `A password reset was requested for this account.\n\nReset your password: ${resetUrl}\n\nThis link expires in 1 hour. If you didn't request this, you can ignore this email.`,
+    });
+
+    await logAudit({
+      userId: Number(user.id),
+      action: 'password_reset_requested',
+      entityType: 'user',
+      entityId: user.id,
+      ipAddress: req.ip,
+    });
+
+    genericResponse();
+  } catch (error) {
+    next(error);
+  }
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+authRoutes.post('/reset-password', passwordResetLimiter, async (req, res, next) => {
+  try {
+    const parseResult = resetPasswordSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      res.status(400).json({ error: 'token and a newPassword of at least 8 characters are required' });
+      return;
+    }
+    const { token, newPassword } = parseResult.data;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const resetRecord = await prisma.password_reset_tokens.findUnique({ where: { token_hash: tokenHash } });
+    const invalidToken = () => res.status(400).json({ error: 'This reset link is invalid or has expired.' });
+
+    if (!resetRecord || resetRecord.used_at || resetRecord.expires_at.getTime() < Date.now()) {
+      invalidToken();
+      return;
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.$transaction([
+      prisma.users.update({
+        where: { id: resetRecord.user_id },
+        data: { password_hash: newHash, failed_login_count: 0, locked_until: null },
+      }),
+      prisma.password_reset_tokens.update({
+        where: { id: resetRecord.id },
+        data: { used_at: new Date() },
+      }),
+    ]);
+
+    await logAudit({
+      userId: Number(resetRecord.user_id),
+      action: 'password_reset_completed',
+      entityType: 'user',
+      entityId: resetRecord.user_id,
+      ipAddress: req.ip,
+    });
+
+    res.json({ message: 'Password has been reset. You can now log in.' });
   } catch (error) {
     next(error);
   }

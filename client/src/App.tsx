@@ -4,10 +4,12 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 import { ArbitratorDetail } from './pages/ArbitratorDetail';
 import { Arbitrators } from './pages/Arbitrators';
+import { AuditLogs } from './pages/AuditLogs';
 import { CaseDetail } from './pages/CaseDetail';
 import { Cases } from './pages/Cases';
 import { Dashboard } from './pages/Dashboard';
 import { DocumentRegister } from './pages/DocumentRegister';
+import { ForgotPassword } from './pages/ForgotPassword';
 import { Hearings } from './pages/Hearings';
 import { Login } from './pages/Login';
 import { NewCase } from './pages/NewCase';
@@ -16,6 +18,7 @@ import { Organizations } from './pages/Organizations';
 import { Parties } from './pages/Parties';
 import { Projects } from './pages/Projects';
 import { Reports } from './pages/Reports';
+import { ResetPassword } from './pages/ResetPassword';
 import { Settings } from './pages/Settings';
 import { Users } from './pages/Users';
 
@@ -25,6 +28,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -44,6 +49,9 @@ export default function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/cases/new" element={<NewCase />} />
+              </Route>
+              <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+                <Route path="/audit-log" element={<AuditLogs />} />
               </Route>
             </Route>
           </Route>

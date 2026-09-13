@@ -17,6 +17,15 @@ const envSchema = z.object({
 
   DOCUMENT_STORAGE_PATH: z.string().min(1),
   MAX_UPLOAD_MB: z.coerce.number().default(25),
+
+  // All optional: password reset degrades to logging the email to the
+  // console (see lib/mail.ts) rather than failing when SMTP isn't set up,
+  // which is the common case in local dev.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 export const env = envSchema.parse(process.env);

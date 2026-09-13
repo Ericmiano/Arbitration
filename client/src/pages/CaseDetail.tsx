@@ -12,6 +12,7 @@ import {
 } from '../api/assignments';
 import { confirmAgreement, getCase } from '../api/cases';
 import { documentDownloadUrl, listDocuments, uploadDocument } from '../api/documents';
+import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -25,7 +26,7 @@ import {
   groupKeyForCase,
   statusTone,
 } from '../lib/caseDisplay';
-import { Arbitrator, Case, DocumentSummary } from '../types';
+import { Arbitrator, Case, DocumentSummary, Hearing } from '../types';
 
 const TABS = ['Overview', 'Parties', 'Project', 'Arbitrator', 'Documents', 'Hearings', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
@@ -37,6 +38,7 @@ export function CaseDetail() {
 
   const [caseRecord, setCaseRecord] = useState<Case | null>(null);
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
+  const [hearings, setHearings] = useState<Hearing[]>([]);
   const [eligible, setEligible] = useState<Arbitrator[]>([]);
   const [extensions, setExtensions] = useState<AssignmentExtension[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,7 @@ export function CaseDetail() {
       }
     });
     listDocuments(caseId).then(setDocuments);
+    listHearings(caseId).then(setHearings);
   }
 
   useEffect(reload, [caseId]);
@@ -143,6 +146,28 @@ export function CaseDetail() {
     const reason = window.prompt('Reason for withdrawing this arbitrator?');
     if (!reason) return;
     await withAsyncAction(() => withdrawAssignment(assignment.id, reason));
+  }
+
+  async function handleScheduleHearing(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!caseId) return;
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    await withAsyncAction(async () => {
+      await scheduleHearing({
+        caseId,
+        scheduledAt: String(form.get('scheduledAt')),
+        mode: form.get('mode') as 'in_person' | 'virtual',
+        venueOrLink: String(form.get('venueOrLink')),
+        agenda: String(form.get('agenda') || '') || undefined,
+        requiredDocuments: String(form.get('requiredDocuments') || '') || undefined,
+      });
+      formEl.reset();
+    });
+  }
+
+  async function handleHearingStatus(hearingId: string, status: 'completed' | 'cancelled') {
+    await withAsyncAction(() => updateHearing(hearingId, { status }));
   }
 
   const dayCount =
@@ -488,8 +513,98 @@ export function CaseDetail() {
       )}
 
       {tab === 'Hearings' && (
-        <div className="px-24 py-24 text-13.5 text-ink-2">
-          Hearing scheduling is not in this pass. Coordinate hearing dates outside the system for now.
+        <div className="px-20 py-16">
+          {isStaff && (
+            <form onSubmit={handleScheduleHearing} className="pb-20 border-b border-rule flex flex-col gap-8 max-w-[460px]">
+              <div className="font-mono text-9.5 tracking-[0.12em] text-muted">SCHEDULE HEARING</div>
+              <div className="flex flex-wrap gap-8">
+                <input
+                  name="scheduledAt"
+                  type="datetime-local"
+                  required
+                  className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+                />
+                <select name="mode" defaultValue="in_person" className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+                  <option value="in_person">In person</option>
+                  <option value="virtual">Virtual</option>
+                </select>
+              </div>
+              <input
+                name="venueOrLink"
+                placeholder="Venue or meeting link"
+                required
+                className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+              />
+              <textarea
+                name="agenda"
+                placeholder="Agenda (optional)"
+                rows={2}
+                className="border border-rule bg-transparent p-8 text-13 outline-none"
+              />
+              <textarea
+                name="requiredDocuments"
+                placeholder="Papers required beforehand (optional)"
+                rows={2}
+                className="border border-rule bg-transparent p-8 text-13 outline-none"
+              />
+              <button type="submit" className="self-start min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+                Schedule
+              </button>
+            </form>
+          )}
+
+          <div className="mt-16">
+            {hearings.length === 0 ? (
+              <p className="text-13 text-muted">No hearings scheduled for this case.</p>
+            ) : (
+              hearings
+                .slice()
+                .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+                .map((h) => (
+                  <div key={h.id} className="py-11 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-6 items-baseline">
+                    <span className="flex-[0_0_170px] font-mono text-11.5">
+                      {new Date(h.scheduled_at).toLocaleString(undefined, {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                    <span className="flex-[0_0_100px] font-mono text-10 tracking-[0.09em] text-muted uppercase">
+                      {h.mode.replace('_', ' ')}
+                    </span>
+                    <span
+                      className={`flex-[0_0_100px] font-mono text-10.5 tracking-[0.06em] uppercase ${
+                        h.status === 'completed' ? 'text-green' : h.status === 'cancelled' ? 'text-muted-2' : h.status === 'postponed' ? 'text-amber' : 'text-ink'
+                      }`}
+                    >
+                      {h.status}
+                    </span>
+                    <span className="basis-full text-12 text-muted">{h.venue_or_link}</span>
+                    {h.agenda && <span className="basis-full text-12.5 text-ink-2">{h.agenda}</span>}
+                    {isStaff && h.status === 'scheduled' && (
+                      <span className="flex gap-8">
+                        <button
+                          type="button"
+                          onClick={() => handleHearingStatus(h.id, 'completed')}
+                          className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                        >
+                          Mark completed
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleHearingStatus(h.id, 'cancelled')}
+                          className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                        >
+                          Cancel
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                ))
+            )}
+          </div>
         </div>
       )}
 
