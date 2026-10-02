@@ -2,22 +2,21 @@ import { FormEvent, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createParty, invitePartyToPortal, listParties } from '../api/parties';
 import { listOrganizations } from '../api/organizations';
+import { ErrorState } from '../components/ErrorState';
+import { useAsyncList } from '../lib/useAsyncList';
 import { Organization, Party } from '../types';
 
 export function Parties() {
-  const [parties, setParties] = useState<Party[]>([]);
+  const { status, data: parties, reload } = useAsyncList<Party>(() => listParties());
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [type, setType] = useState<'individual' | 'organization'>('individual');
   const [error, setError] = useState<string | null>(null);
   const [invited, setInvited] = useState<{ email: string; password: string } | null>(null);
 
-  function reload() {
-    listParties().then(setParties);
+  useEffect(() => {
     listOrganizations().then(setOrganizations);
-  }
-
-  useEffect(reload, []);
+  }, []);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -57,7 +56,9 @@ export function Parties() {
       <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-26 gap-y-18 items-end">
         <div className="flex-1 min-w-[240px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Parties</h1>
-          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">{parties.length} ON RECORD</div>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">
+            {status === 'loading' ? 'LOADING...' : `${parties.length} ON RECORD`}
+          </div>
         </div>
         <button
           type="button"
@@ -134,27 +135,34 @@ export function Parties() {
         </form>
       )}
 
-      {parties.map((p) => (
-        <div key={p.id} className="px-24 py-14 border-b border-hairline flex flex-wrap gap-x-16 gap-y-4 items-baseline">
-          <span className="flex-[1_1_220px] min-w-0 text-13.5 font-medium">{p.full_name}</span>
-          <span className="flex-[0_0_120px] font-mono text-10.5 tracking-[0.06em] text-muted uppercase">{p.type}</span>
-          <span className="flex-[1_1_200px] min-w-0 text-13 text-ink-2">{p.email}</span>
-          <span className="ml-auto">
-            {p.user_id ? (
-              <span className="font-mono text-10.5 text-green">PORTAL ACCESS GRANTED</span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => handleInvite(p.id)}
-                className="min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
-              >
-                Grant access
-              </button>
-            )}
-          </span>
-        </div>
-      ))}
-      {parties.length === 0 && <p className="px-24 py-20 text-13">No parties on record yet.</p>}
+      {status === 'loading' ? (
+        <p className="px-24 py-20 text-13">Loading...</p>
+      ) : status === 'error' ? (
+        <ErrorState onRetry={reload} />
+      ) : status === 'empty' ? (
+        <p className="px-24 py-20 text-13">No parties on record yet.</p>
+      ) : (
+        parties.map((p) => (
+          <div key={p.id} className="px-24 py-14 border-b border-hairline flex flex-wrap gap-x-16 gap-y-4 items-baseline">
+            <span className="flex-[1_1_220px] min-w-0 text-13.5 font-medium">{p.full_name}</span>
+            <span className="flex-[0_0_120px] font-mono text-10.5 tracking-[0.06em] text-muted uppercase">{p.type}</span>
+            <span className="flex-[1_1_200px] min-w-0 text-13 text-ink-2">{p.email}</span>
+            <span className="ml-auto">
+              {p.user_id ? (
+                <span className="font-mono text-10.5 text-green">PORTAL ACCESS GRANTED</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleInvite(p.id)}
+                  className="min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
+                >
+                  Grant access
+                </button>
+              )}
+            </span>
+          </div>
+        ))
+      )}
     </div>
   );
 }

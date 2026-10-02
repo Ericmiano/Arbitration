@@ -1,8 +1,8 @@
 import { apiClient } from './client';
 import { Party } from '../types';
 
-export async function listParties(): Promise<Party[]> {
-  const { data } = await apiClient.get('/parties');
+export async function listParties(q?: string): Promise<Party[]> {
+  const { data } = await apiClient.get('/parties', { params: q ? { q } : undefined });
   return data;
 }
 

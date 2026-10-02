@@ -54,7 +54,7 @@ export function ArbitratorDetail() {
 
   if (!arbitrator) return <p>Loading...</p>;
 
-  const activeConflicts = (arbitrator.arbitrator_conflicts ?? []).filter(
+  const activeConflicts = (arbitrator.conflicts ?? []).filter(
     (c) => !c.expires_at || new Date(c.expires_at) > new Date(),
   );
 
@@ -173,7 +173,7 @@ export function ArbitratorDetail() {
         <div className="flex-[1_1_260px] px-20 py-14 border-b border-rule border-r border-rule">
           <div className="font-mono text-9.5 tracking-[0.12em] text-muted">AREAS OF EXPERTISE</div>
           <div className="mt-8 flex flex-wrap gap-x-8 gap-y-4 font-mono text-10.5 text-ink-2">
-            {arbitrator.arbitrator_specializations.map((s) => (
+            {arbitrator.specializations.map((s) => (
               <span key={s.specialization}>{s.specialization.toUpperCase()}</span>
             ))}
           </div>
@@ -181,22 +181,22 @@ export function ArbitratorDetail() {
         <div className="flex-[1_1_260px] px-20 py-14 border-b border-rule">
           <div className="font-mono text-9.5 tracking-[0.12em] text-muted">REGISTRATIONS</div>
           <ul className="mt-8 space-y-4 text-13">
-            {(arbitrator.arbitrator_registrations ?? []).map((r) => (
+            {(arbitrator.registrations ?? []).map((r) => (
               <li key={r.id}>
                 {r.body}
                 {r.registration_number ? ` — ${r.registration_number}` : ''}
               </li>
             ))}
-            {(arbitrator.arbitrator_registrations ?? []).length === 0 && <li className="text-muted">None on file</li>}
+            {(arbitrator.registrations ?? []).length === 0 && <li className="text-muted">None on file</li>}
           </ul>
         </div>
       </div>
 
-      {(arbitrator.arbitrator_qualifications ?? []).length > 0 && (
+      {(arbitrator.qualifications ?? []).length > 0 && (
         <div className="px-20 py-14 border-b border-rule">
           <div className="font-mono text-9.5 tracking-[0.12em] text-muted">ACADEMIC QUALIFICATIONS</div>
           <ul className="mt-8 space-y-4 text-13">
-            {arbitrator.arbitrator_qualifications!.map((q) => (
+            {arbitrator.qualifications!.map((q) => (
               <li key={q.id}>{q.qualification}</li>
             ))}
           </ul>

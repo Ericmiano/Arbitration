@@ -11,7 +11,7 @@ class ArbitratorScoreHistory extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'arbitrator_id', 'case_id', 'score', 'timeliness_component', 'outcome_component',
+        'arbitrator_id', 'case_id', 'score', 'responsiveness_component', 'outcome_component',
         'workload_component', 'calculated_at',
     ];
 

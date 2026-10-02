@@ -1,8 +1,8 @@
 import { apiClient } from './client';
 import { Arbitrator, ArbitratorProfile } from '../types';
 
-export async function listArbitrators(): Promise<Arbitrator[]> {
-  const { data } = await apiClient.get('/arbitrators');
+export async function listArbitrators(q?: string): Promise<Arbitrator[]> {
+  const { data } = await apiClient.get('/arbitrators', { params: q ? { q } : undefined });
   return data;
 }
 

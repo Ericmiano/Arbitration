@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { listCases } from '../api/cases';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
 import {
   arbitratorLabel,
@@ -14,54 +15,97 @@ import {
 } from '../lib/caseDisplay';
 import { Case } from '../types';
 
+const PER_PAGE = 25;
+// A generous single-page fetch for CSV export, so exporting the register
+// isn't truncated to whatever page happens to be on screen.
+const EXPORT_PER_PAGE = 1000;
+
 const FILTERS = [
   { label: 'All', key: null },
   { label: 'Overdue', key: 'overdue' },
   { label: 'Awaiting appointment', key: 'appoint' },
   { label: 'In progress', key: 'progress' },
   { label: 'Concluded', key: 'closed' },
+  { label: 'Withdrawn', key: 'withdrawn' },
 ] as const;
 
 export function Cases() {
-  const [cases, setCases] = useState<Case[] | null>(null);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>(null);
-  const [query, setQuery] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') ?? '';
 
-  function reload(q?: string) {
-    listCases(q).then(setCases);
+  const [cases, setCases] = useState<Case[] | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]['key']>(null);
+  const [query, setQuery] = useState(initialQuery);
+  const [activeQuery, setActiveQuery] = useState<string | undefined>(initialQuery || undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [exporting, setExporting] = useState(false);
+
+  function reload(page: number, q?: string) {
+    setLoadError(null);
+    listCases({ q, page, perPage: PER_PAGE })
+      .then((result) => {
+        setCases(result.data);
+        setCurrentPage(result.currentPage);
+        setLastPage(result.lastPage);
+        setTotal(result.total);
+      })
+      .catch(setLoadError);
   }
 
-  useEffect(() => reload(), []);
+  useEffect(() => reload(1, initialQuery || undefined), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSearch(event: FormEvent) {
     event.preventDefault();
-    reload(query || undefined);
+    const q = query || undefined;
+    setActiveQuery(q);
+    reload(1, q);
+  }
+
+  function handlePrevious() {
+    if (currentPage <= 1) return;
+    reload(currentPage - 1, activeQuery);
+  }
+
+  function handleNext() {
+    if (currentPage >= lastPage) return;
+    reload(currentPage + 1, activeQuery);
   }
 
   function handleExport() {
-    if (!cases) return;
-    downloadCsv(
-      `aak-cases-${new Date().toISOString().slice(0, 10)}.csv`,
-      [
-        { header: 'Case number', value: (c: Case) => c.case_number },
-        { header: 'Status', value: (c: Case) => c.status },
-        { header: 'Category', value: (c: Case) => c.category },
-        { header: 'Dispute value', value: (c: Case) => disputeLine(c) },
-        { header: 'Claimant', value: (c: Case) => partyLine(c).claimant },
-        { header: 'Respondent', value: (c: Case) => partyLine(c).respondent },
-        { header: 'Filed at', value: (c: Case) => c.filed_at },
-        { header: 'Due date', value: (c: Case) => c.due_date ?? '' },
-        { header: 'Arbitrator', value: (c: Case) => arbitratorLabel(c) },
-      ],
-      cases,
-    );
+    setExporting(true);
+    listCases({ q: activeQuery, perPage: EXPORT_PER_PAGE })
+      .then((result) => {
+        downloadCsv(
+          `aak-cases-${new Date().toISOString().slice(0, 10)}.csv`,
+          [
+            { header: 'Case number', value: (c: Case) => c.case_number },
+            { header: 'Status', value: (c: Case) => c.status },
+            { header: 'Category', value: (c: Case) => c.category },
+            { header: 'Dispute value', value: (c: Case) => disputeLine(c) },
+            { header: 'Claimant', value: (c: Case) => partyLine(c).claimant },
+            { header: 'Respondent', value: (c: Case) => partyLine(c).respondent },
+            { header: 'Filed at', value: (c: Case) => c.filed_at },
+            { header: 'Due date', value: (c: Case) => c.due_date ?? '' },
+            { header: 'Arbitrator', value: (c: Case) => arbitratorLabel(c) },
+          ],
+          result.data,
+        );
+      })
+      .finally(() => setExporting(false));
   }
 
+  if (loadError) return <ErrorState onRetry={() => reload(currentPage, activeQuery)} />;
   if (!cases) return <p>Loading...</p>;
 
   const numbered = cases.map((c, i) => ({ c, no: String(i + 1).padStart(2, '0') }));
   const filtered = filter ? numbered.filter(({ c }) => groupKeyForCase(c) === filter) : numbered;
 
+  // Counts are scoped to the current page, not the whole register - the
+  // listing is now server-paginated, so a full-register count per status
+  // would mean an extra fetch per chip. Good enough for "what's on this page".
   const counts = Object.fromEntries(
     FILTERS.map((f) => [
       f.label,
@@ -75,7 +119,7 @@ export function Cases() {
         <div className="flex-1 min-w-[300px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em] leading-[1.1]">All cases</h1>
           <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
-            {cases.length} arbitration{cases.length === 1 ? '' : 's'} on the register
+            {total} arbitration{total === 1 ? '' : 's'} on the register
           </div>
         </div>
         <form onSubmit={handleSearch} className="flex gap-8 items-center">
@@ -88,8 +132,13 @@ export function Cases() {
           <button type="submit" className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
             Search
           </button>
-          <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
-            Export CSV
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={exporting}
+            className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band disabled:cursor-not-allowed disabled:text-muted-3"
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
           </button>
         </form>
       </div>
@@ -136,7 +185,7 @@ export function Cases() {
                   >
                     <span className="font-mono text-11.5 tracking-[0.04em] flex-[0_0_106px]">{c.case_number}</span>
                     <span className="flex-[2_1_220px] min-w-0 text-13.5 font-medium">
-                      {c.projects?.name ?? c.category}
+                      {c.project?.name ?? c.category}
                     </span>
                     <span className={`flex-[1_1_176px] min-w-0 font-mono text-10.5 tracking-[0.04em] ${statusTone(group.key)}`}>
                       {deadlineLine(c, group.key)}
@@ -156,7 +205,7 @@ export function Cases() {
                         <div className="flex flex-wrap gap-x-12 gap-y-4 items-baseline">
                           <span className="font-mono text-12 tracking-[0.04em]">{c.case_number}</span>
                           <span className="text-15 font-semibold tracking-[-0.01em]">
-                            {c.projects?.name ?? c.category}
+                            {c.project?.name ?? c.category}
                           </span>
                         </div>
                         <div className="text-13 text-ink-2">
@@ -182,15 +231,24 @@ export function Cases() {
 
       <div className="px-24 py-12 flex flex-wrap gap-x-16 gap-y-10 items-center text-12.5 text-ink-2">
         <span className="font-mono text-10.5 tracking-[0.08em]">
-          SHOWING {filtered.length} OF {cases.length}
+          PAGE {currentPage} OF {lastPage} · {total} TOTAL
         </span>
         <span className="ml-auto flex gap-14">
-          <button type="button" disabled className="bg-transparent border-0 py-2 text-12.5 text-muted-3 cursor-not-allowed" aria-disabled="true">
+          <button
+            type="button"
+            onClick={handlePrevious}
+            disabled={currentPage <= 1}
+            aria-disabled={currentPage <= 1}
+            className="bg-transparent border-0 py-2 text-12.5 border-b border-ink cursor-pointer hover:text-red hover:border-red disabled:border-0 disabled:text-muted-3 disabled:cursor-not-allowed"
+          >
             Previous
           </button>
           <button
             type="button"
-            className="bg-transparent border-0 py-2 text-12.5 border-b border-ink cursor-pointer hover:text-red hover:border-red"
+            onClick={handleNext}
+            disabled={currentPage >= lastPage}
+            aria-disabled={currentPage >= lastPage}
+            className="bg-transparent border-0 py-2 text-12.5 border-b border-ink cursor-pointer hover:text-red hover:border-red disabled:border-0 disabled:text-muted-3 disabled:cursor-not-allowed"
           >
             Next
           </button>

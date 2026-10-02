@@ -1,35 +1,37 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listCases } from '../api/cases';
+import { ErrorState } from '../components/ErrorState';
 import {
   arbitratorLabel,
   deadlineLine,
   disputeLine,
   GROUP_DEFS,
   groupKeyForCase,
+  isTerminalGroup,
   marginNote,
   partyLine,
   statusTone,
 } from '../lib/caseDisplay';
 import { useAuth } from '../context/AuthContext';
+import { useAsyncList } from '../lib/useAsyncList';
 import { Case } from '../types';
 
 export function Dashboard() {
   const { user } = useAuth();
-  const [cases, setCases] = useState<Case[] | null>(null);
+  // The docket is a curated "needs action today" view, already filtered
+  // down to non-terminal cases - a generous fixed page covers the real
+  // register without needing paging controls here (see Cases.tsx for those).
+  const { status, data: cases, reload } = useAsyncList<Case>(() => listCases({ perPage: 200 }).then((page) => page.data));
 
-  useEffect(() => {
-    listCases().then(setCases);
-  }, []);
-
-  if (!cases) return <p>Loading...</p>;
+  if (status === 'error') return <ErrorState onRetry={reload} />;
+  if (status === 'loading') return <p>Loading...</p>;
 
   const overdueCount = cases.filter((c) => groupKeyForCase(c) === 'overdue').length;
   const appointCount = cases.filter((c) => groupKeyForCase(c) === 'appoint').length;
   const activeCount = cases.filter((c) => !['closed', 'concluded', 'withdrawn'].includes(c.status)).length;
 
-  // Docket hides concluded/closed matters - that's what "All cases" is for.
-  const visible = cases.filter((c) => groupKeyForCase(c) !== 'closed');
+  // Docket hides concluded/withdrawn matters - that's what "All cases" is for.
+  const visible = cases.filter((c) => !isTerminalGroup(groupKeyForCase(c)));
   const numbered = visible.map((c, i) => ({ c, no: String(i + 1).padStart(2, '0') }));
 
   const today = new Date().toLocaleDateString('en-GB', {
@@ -55,7 +57,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {GROUP_DEFS.filter((g) => g.key !== 'closed').map((group) => {
+      {GROUP_DEFS.filter((g) => !isTerminalGroup(g.key)).map((group) => {
         const rows = numbered.filter(({ c }) => groupKeyForCase(c) === group.key);
         if (rows.length === 0) return null;
 
@@ -79,7 +81,7 @@ export function Dashboard() {
                   >
                     <span className="font-mono text-11.5 tracking-[0.04em] flex-[0_0_106px]">{c.case_number}</span>
                     <span className="flex-[2_1_220px] min-w-0 text-13.5 font-medium">
-                      {c.projects?.name ?? c.category}
+                      {c.project?.name ?? c.category}
                     </span>
                     <span className={`flex-[1_1_176px] min-w-0 font-mono text-10.5 tracking-[0.04em] ${statusTone(group.key)}`}>
                       {deadlineLine(c, group.key)}
@@ -99,7 +101,7 @@ export function Dashboard() {
                         <div className="flex flex-wrap gap-x-12 gap-y-4 items-baseline">
                           <span className="font-mono text-12 tracking-[0.04em]">{c.case_number}</span>
                           <span className="text-15 font-semibold tracking-[-0.01em]">
-                            {c.projects?.name ?? c.category}
+                            {c.project?.name ?? c.category}
                           </span>
                         </div>
                         <div className="text-13 text-ink-2">
@@ -123,20 +125,14 @@ export function Dashboard() {
 
       <div className="px-24 py-12 flex flex-wrap gap-x-16 gap-y-10 items-center text-12.5 text-ink-2">
         <span className="font-mono text-10.5 tracking-[0.08em]">
-          {overdueCount + appointCount} MATTER{overdueCount + appointCount === 1 ? '' : 'S'} NEED ACTION TODAY ·
-          FULL REGISTER UNDER CASES
+          {overdueCount + appointCount} MATTER{overdueCount + appointCount === 1 ? '' : 'S'} NEED ACTION TODAY
         </span>
-        <span className="ml-auto flex gap-14">
-          <button type="button" disabled className="bg-transparent border-0 py-2 text-12.5 text-muted-3 cursor-not-allowed" aria-disabled="true">
-            Previous
-          </button>
-          <button
-            type="button"
-            className="bg-transparent border-0 py-2 text-12.5 border-b border-ink cursor-pointer hover:text-red hover:border-red"
-          >
-            Next
-          </button>
-        </span>
+        <Link
+          to="/cases"
+          className="ml-auto text-12.5 border-b border-ink no-underline text-ink-2 hover:text-red hover:border-red"
+        >
+          Full register under Cases
+        </Link>
       </div>
     </div>
   );

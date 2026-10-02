@@ -1,19 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { documentDownloadUrl, listAllDocuments } from '../api/documents';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
+import { useAsyncList } from '../lib/useAsyncList';
 import { DocumentSummary } from '../types';
 
 export function DocumentRegister() {
-  const [documents, setDocuments] = useState<DocumentSummary[] | null>(null);
+  const { status, data: documents, reload } = useAsyncList<DocumentSummary>(() => listAllDocuments());
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    listAllDocuments().then(setDocuments);
-  }, []);
-
   const filtered = useMemo(() => {
-    if (!documents) return null;
     const q = query.trim().toLowerCase();
     if (!q) return documents;
     return documents.filter((d) =>
@@ -22,7 +19,6 @@ export function DocumentRegister() {
   }, [documents, query]);
 
   function handleExport() {
-    if (!filtered) return;
     downloadCsv(
       `aak-documents-${new Date().toISOString().slice(0, 10)}.csv`,
       [
@@ -37,7 +33,8 @@ export function DocumentRegister() {
     );
   }
 
-  if (!documents) return <p>Loading...</p>;
+  if (status === 'loading') return <p>Loading...</p>;
+  if (status === 'error') return <ErrorState onRetry={reload} />;
 
   return (
     <div className="bg-sheet border border-ink">
@@ -59,10 +56,10 @@ export function DocumentRegister() {
         </button>
       </div>
 
-      {filtered && filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="px-24 py-20 text-13">{query ? 'No documents match this search.' : 'No documents visible to you yet.'}</p>
       ) : (
-        filtered?.map((d) => (
+        filtered.map((d) => (
           <div key={d.publicId} className="px-24 py-14 border-b border-hairline flex flex-wrap gap-x-16 gap-y-6 items-baseline">
             <span className="flex-[1_1_240px] min-w-0 text-13.5 font-medium">{d.fileName}</span>
             <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">

@@ -1,35 +1,29 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createArbitrator, listArbitrators } from '../api/arbitrators';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
+import { useAsyncList } from '../lib/useAsyncList';
 import { Arbitrator } from '../types';
 
 export function Arbitrators() {
-  const [arbitrators, setArbitrators] = useState<Arbitrator[] | null>(null);
+  const { status, data: arbitrators, reload } = useAsyncList<Arbitrator>(() => listArbitrators());
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
   const [query, setQuery] = useState('');
 
-  function reload() {
-    listArbitrators().then(setArbitrators);
-  }
-
-  useEffect(reload, []);
-
   const filtered = useMemo(() => {
-    if (!arbitrators) return null;
     const q = query.trim().toLowerCase();
     if (!q) return arbitrators;
     return arbitrators.filter((a) =>
-      [a.full_name, a.aak_membership_no, a.current_organization, ...a.arbitrator_specializations.map((s) => s.specialization)]
+      [a.full_name, a.aak_membership_no, a.current_organization, ...a.specializations.map((s) => s.specialization)]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q)),
     );
   }, [arbitrators, query]);
 
   function handleExport() {
-    if (!filtered) return;
     downloadCsv(
       `aak-arbitrators-${new Date().toISOString().slice(0, 10)}.csv`,
       [
@@ -41,7 +35,7 @@ export function Arbitrators() {
         { header: 'Years of practice', value: (a: Arbitrator) => a.years_of_practice ?? '' },
         { header: 'Current position', value: (a: Arbitrator) => a.current_position ?? '' },
         { header: 'Current organization', value: (a: Arbitrator) => a.current_organization ?? '' },
-        { header: 'Specializations', value: (a: Arbitrator) => a.arbitrator_specializations.map((s) => s.specialization).join('; ') },
+        { header: 'Specializations', value: (a: Arbitrator) => a.specializations.map((s) => s.specialization).join('; ') },
       ],
       filtered,
     );
@@ -87,7 +81,7 @@ export function Arbitrators() {
         <div className="flex-1 min-w-[240px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em] leading-[1.1]">Arbitrators</h1>
           <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">
-            {arbitrators ? `${arbitrators.length} ON THE REGISTER` : 'LOADING...'}
+            {status === 'loading' ? 'LOADING...' : status === 'error' ? 'FAILED TO LOAD' : `${arbitrators.length} ON THE REGISTER`}
           </div>
         </div>
         <input
@@ -153,8 +147,10 @@ export function Arbitrators() {
         </form>
       )}
 
-      {filtered === null ? (
+      {status === 'loading' ? (
         <p className="px-24 py-20 text-13">Loading...</p>
+      ) : status === 'error' ? (
+        <ErrorState onRetry={reload} />
       ) : filtered.length === 0 ? (
         <p className="px-24 py-20 text-13">
           {query ? 'No arbitrators match this search.' : 'No arbitrators on the register yet.'}
@@ -185,7 +181,7 @@ export function Arbitrators() {
               SCORE {a.score} · {a.cases_closed_count} CLOSED
             </div>
             <div className="flex-[2_1_220px] font-mono text-10.5 text-muted-2 tracking-[0.04em]">
-              {a.arbitrator_specializations.map((s) => s.specialization).join(' · ')}
+              {a.specializations.map((s) => s.specialization).join(' · ')}
             </div>
           </Link>
         ))

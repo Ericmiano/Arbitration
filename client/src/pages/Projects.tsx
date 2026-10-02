@@ -1,22 +1,21 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { listParties } from '../api/parties';
 import { createContract, createProject, listProjects } from '../api/projects';
+import { ErrorState } from '../components/ErrorState';
+import { useAsyncList } from '../lib/useAsyncList';
 import { Party, Project } from '../types';
 import { formatMoney } from '../lib/caseDisplay';
 
 export function Projects() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { status, data: projects, reload } = useAsyncList<Project>(() => listProjects());
   const [parties, setParties] = useState<Party[]>([]);
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [contractProjectId, setContractProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  function reload() {
-    listProjects().then(setProjects);
+  useEffect(() => {
     listParties().then(setParties);
-  }
-
-  useEffect(reload, []);
+  }, []);
 
   async function handleCreateProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,7 +67,9 @@ export function Projects() {
       <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-26 gap-y-18 items-end">
         <div className="flex-1 min-w-[240px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Projects</h1>
-          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">{projects.length} ON RECORD</div>
+          <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">
+            {status === 'loading' ? 'LOADING...' : `${projects.length} ON RECORD`}
+          </div>
         </div>
         <button
           type="button"
@@ -111,7 +112,14 @@ export function Projects() {
         </form>
       )}
 
-      {projects.map((project) => (
+      {status === 'loading' ? (
+        <p className="px-24 py-20 text-13">Loading...</p>
+      ) : status === 'error' ? (
+        <ErrorState onRetry={reload} />
+      ) : status === 'empty' ? (
+        <p className="px-24 py-20 text-13">No projects on record yet.</p>
+      ) : (
+        projects.map((project) => (
         <div key={project.id} className="border-b border-hairline px-24 py-18">
           <div className="text-15 font-semibold tracking-[-0.01em]">{project.name}</div>
           <div className="mt-4 font-mono text-10.5 text-muted uppercase">
@@ -187,8 +195,8 @@ export function Projects() {
             </form>
           )}
         </div>
-      ))}
-      {projects.length === 0 && <p className="px-24 py-20 text-13">No projects on record yet.</p>}
+        ))
+      )}
     </div>
   );
 }

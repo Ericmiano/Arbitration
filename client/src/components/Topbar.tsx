@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listNotifications } from '../api/notifications';
 import { useAuth } from '../context/AuthContext';
+import { GlobalSearch } from './GlobalSearch';
 
-export function Topbar({ crumb }: { crumb: string }) {
+export function Topbar({ crumb, onOpenNav }: { crumb: string; onOpenNav: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isStaff = user?.role === 'admin' || user?.role === 'registrar' || user?.role === 'staff';
@@ -16,17 +17,24 @@ export function Topbar({ crumb }: { crumb: string }) {
   }, []);
 
   return (
-    <div className="bg-sheet border-b border-ink px-26 min-h-[54px] flex items-center flex-wrap gap-x-16 gap-y-10 sticky top-0 z-[5]">
+    <div className="bg-sheet border-b border-ink px-16 md:px-26 min-h-[54px] flex items-center flex-wrap gap-x-16 gap-y-10 sticky top-0 z-[5]">
+      <button
+        type="button"
+        onClick={onOpenNav}
+        aria-label="Open navigation menu"
+        className="md:hidden h-[30px] w-[30px] flex items-center justify-center bg-transparent border border-ink cursor-pointer"
+      >
+        <span className="sr-only">Menu</span>
+        <div className="flex flex-col gap-3">
+          <span className="block w-14 h-[2px] bg-ink" />
+          <span className="block w-14 h-[2px] bg-ink" />
+          <span className="block w-14 h-[2px] bg-ink" />
+        </div>
+      </button>
+
       <span className="font-mono text-10 tracking-[0.13em] text-muted">{crumb}</span>
 
-      <label className="ml-auto flex items-center gap-9 border-b border-rule h-[30px] w-[250px] max-w-[40vw]">
-        <span className="font-mono text-9.5 tracking-[0.12em] text-muted-2">FIND</span>
-        <input
-          type="text"
-          placeholder="Case number, party or project"
-          className="border-0 bg-transparent outline-none text-13 w-full text-ink"
-        />
-      </label>
+      <GlobalSearch />
 
       <button
         type="button"

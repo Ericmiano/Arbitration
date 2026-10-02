@@ -1,6 +1,6 @@
-import { Case } from '../types';
+import { Case, Tribunal } from '../types';
 
-export type CaseGroupKey = 'overdue' | 'appoint' | 'progress' | 'closed';
+export type CaseGroupKey = 'overdue' | 'appoint' | 'progress' | 'closed' | 'withdrawn';
 
 export interface GroupDef {
   key: CaseGroupKey;
@@ -26,19 +26,40 @@ export const GROUP_DEFS: GroupDef[] = [
     note: 'Nothing required from AAK today.',
     dense: true,
   },
-  { key: 'closed', label: 'CONCLUDED', tone: 'text-muted-2', note: 'Retained for the register.', dense: true },
+  { key: 'closed', label: 'CONCLUDED', tone: 'text-green', note: 'Award issued or settled - retained for the register.', dense: true },
+  { key: 'withdrawn', label: 'WITHDRAWN', tone: 'text-muted-2', note: 'No award or settlement - matter withdrawn.', dense: true },
 ];
 
 export function activeAssignment(c: Case) {
   return c.assignments[0];
 }
 
+/** The tribunal currently forming/constituted for this case, if the tribunal model has been used on it. */
+export function activeTribunal(c: Case): Tribunal | undefined {
+  return c.active_tribunal?.[0];
+}
+
+export function activeTribunalMembers(c: Case) {
+  const tribunal = activeTribunal(c);
+  if (!tribunal) return [];
+  return tribunal.members.filter((m) => ['nominated', 'appointed', 'accepted'].includes(m.status));
+}
+
 export function groupKeyForCase(c: Case): CaseGroupKey {
   const assignment = activeAssignment(c);
   if (assignment && (assignment.status === 'overdue' || assignment.status === 'escalated')) return 'overdue';
-  if (['concluded', 'closed', 'withdrawn'].includes(c.status)) return 'closed';
+  // Withdrawn is procedurally distinct from an award or settlement - no
+  // decision was ever reached - so it gets its own group rather than
+  // being folded into "concluded".
+  if (c.status === 'withdrawn') return 'withdrawn';
+  if (['concluded', 'closed'].includes(c.status)) return 'closed';
   if (['pending_assignment', 'pending_agreement', 'intake'].includes(c.status)) return 'appoint';
   return 'progress';
+}
+
+/** True for either terminal group - used where "not still active" is the only distinction that matters (e.g. hiding both from an action-needed docket). */
+export function isTerminalGroup(group: CaseGroupKey): boolean {
+  return group === 'closed' || group === 'withdrawn';
 }
 
 export function statusTone(group: CaseGroupKey): string {
@@ -77,7 +98,11 @@ export function deadlineLine(c: Case, group: CaseGroupKey): string {
   }
   if (group === 'closed') {
     const days = c.concluded_at ? daysBetween(new Date(c.filed_at), new Date(c.concluded_at)) : null;
-    return `CLOSED ${c.concluded_at ? formatMonoDate(c.concluded_at) : '-'}${days !== null ? ` · ${days} DAYS` : ''}`;
+    const outcomeLabel = c.outcome ? c.outcome.replace(/_/g, ' ').toUpperCase() : 'CONCLUDED';
+    return `${outcomeLabel} ${c.concluded_at ? formatMonoDate(c.concluded_at) : '-'}${days !== null ? ` · ${days} DAYS` : ''}`;
+  }
+  if (group === 'withdrawn') {
+    return `WITHDRAWN${c.concluded_at ? ` ${formatMonoDate(c.concluded_at)}` : ''}`;
   }
   // progress
   return assignment ? `DUE ${formatMonoDate(assignment.due_date)}` : 'IN PROGRESS';
@@ -99,12 +124,23 @@ export function marginNote(c: Case, group: CaseGroupKey): string {
 }
 
 export function arbitratorLabel(c: Case): string {
+  const tribunal = activeTribunal(c);
+  if (tribunal) {
+    const members = activeTribunalMembers(c);
+    if (members.length === 0) return 'NOT APPOINTED';
+    if (tribunal.tribunal_type === 'sole') return members[0].arbitrator.full_name.toUpperCase();
+    return `PANEL (${members.length}/3)`;
+  }
+
+  // Cases created before the tribunal model (or where it hasn't been used
+  // yet) have no active_tribunal row at all - fall back to the plain
+  // assignment they already have.
   const assignment = activeAssignment(c);
   return assignment ? assignment.arbitrators.full_name.toUpperCase() : 'NOT APPOINTED';
 }
 
 export function disputeLine(c: Case): string {
-  const location = c.projects?.location;
+  const location = c.project?.location;
   return `DISPUTE ${formatMoney(c.dispute_value, c.currency)}${location ? ` · ${location.toUpperCase()}` : ''}`;
 }
 
@@ -167,7 +203,7 @@ export function buildTimeline(c: Case): TimelineEvent[] {
 }
 
 export function partyLine(c: Case): { claimant: string; respondent: string } {
-  const claimant = c.case_parties.find((p) => p.role === 'claimant')?.parties.full_name ?? 'Unnamed claimant';
-  const respondent = c.case_parties.find((p) => p.role === 'respondent')?.parties.full_name ?? 'Unnamed respondent';
+  const claimant = c.parties.find((p) => p.pivot.role === 'claimant')?.full_name ?? 'Unnamed claimant';
+  const respondent = c.parties.find((p) => p.pivot.role === 'respondent')?.full_name ?? 'Unnamed respondent';
   return { claimant, respondent };
 }

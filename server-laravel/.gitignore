@@ -18,7 +18,10 @@
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
+# vendor/ is committed, not ignored - Composer's availability on the cPanel
+# host is unconfirmed (no SSH/Terminal to check), so deploy ships a
+# pre-built --no-dev vendor/ instead of depending on it. See
+# scripts/prepare-backend-for-deploy.sh and DEPLOYMENT.md.
 Homestead.json
 Homestead.yaml
 Thumbs.db

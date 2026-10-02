@@ -20,8 +20,8 @@ export default {
       'ink-2': '#3C382F',
       'ink-3': '#5A544A',
       muted: '#6B6455',
-      'muted-2': '#8A8373',
-      'muted-3': '#A89F8E',
+      'muted-2': '#777163',
+      'muted-3': '#7A705E',
 
       hairline: '#E2DBCD',
       rule: '#CFC8BA',
@@ -37,8 +37,8 @@ export default {
       'nav-border': '#302C24',
       'nav-text': '#C6BFB1',
       'nav-text-active': '#F5F1E8',
-      'nav-muted': '#857E71',
-      'nav-count': '#7A7466',
+      'nav-muted': '#8B8376',
+      'nav-count': '#898272',
       'nav-count-active': '#A79F90',
     },
     fontFamily: {

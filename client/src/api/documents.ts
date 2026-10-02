@@ -7,8 +7,8 @@ export async function listDocuments(caseId: string): Promise<DocumentSummary[]> 
 }
 
 /** The full document register across every case the current user can access. */
-export async function listAllDocuments(): Promise<DocumentSummary[]> {
-  const { data } = await apiClient.get('/documents');
+export async function listAllDocuments(q?: string): Promise<DocumentSummary[]> {
+  const { data } = await apiClient.get('/documents', { params: q ? { q } : undefined });
   return data;
 }
 

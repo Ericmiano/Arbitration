@@ -14,9 +14,10 @@ class ArbitrationCase extends Model
     protected $table = 'cases';
 
     protected $fillable = [
-        'project_id', 'contract_id', 'dispute_value', 'currency', 'category', 'description',
+        'case_number', 'project_id', 'contract_id', 'dispute_value', 'currency', 'category', 'description',
         'basis', 'submission_agreement_doc_id', 'sla_tier', 'due_date', 'status', 'filed_at',
         'concluded_at', 'outcome', 'outcome_detail', 'award_challenged', 'created_by',
+        'ai_suggested_category', 'ai_suggested_specializations', 'ai_scanned_at',
     ];
 
     protected function casts(): array
@@ -27,6 +28,8 @@ class ArbitrationCase extends Model
             'filed_at' => 'datetime',
             'concluded_at' => 'datetime',
             'award_challenged' => 'boolean',
+            'ai_suggested_specializations' => 'array',
+            'ai_scanned_at' => 'datetime',
         ];
     }
 
@@ -75,11 +78,54 @@ class ArbitrationCase extends Model
         return $this->hasMany(ArbitratorScoreHistory::class, 'case_id');
     }
 
+    public function caseUpdates(): HasMany
+    {
+        return $this->hasMany(CaseUpdate::class, 'case_id');
+    }
+
     /** The currently active (non withdrawn/reassigned) assignment, if any. */
     public function activeAssignment(): HasMany
     {
         return $this->hasMany(Assignment::class, 'case_id')
-            ->whereIn('status', ['ongoing', 'overdue', 'escalated', 'completed'])
+            ->whereIn('status', ['ongoing', 'completed'])
             ->latest('assigned_at');
+    }
+
+    public function tribunals(): HasMany
+    {
+        return $this->hasMany(CaseTribunal::class, 'case_id');
+    }
+
+    /** The tribunal currently hearing the case, if one has been constituted (or is forming). */
+    public function activeTribunal(): HasMany
+    {
+        return $this->hasMany(CaseTribunal::class, 'case_id')
+            ->whereIn('status', ['forming', 'constituted'])
+            ->latest('created_at');
+    }
+
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(CaseStatusHistory::class, 'case_id');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(CaseEvent::class, 'case_id');
+    }
+
+    public function conflictChecks(): HasMany
+    {
+        return $this->hasMany(CaseConflictCheck::class, 'case_id');
+    }
+
+    public function filings(): HasMany
+    {
+        return $this->hasMany(Filing::class, 'case_id');
+    }
+
+    public function deadlines(): HasMany
+    {
+        return $this->hasMany(Deadline::class, 'case_id');
     }
 }

@@ -59,6 +59,16 @@ return [
     // frontend, not this API.
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
 
+    // Absolute path OUTSIDE the public web root where uploaded case
+    // documents are stored - matches the Node API's DOCUMENT_STORAGE_PATH.
+    'document_storage_path' => env('DOCUMENT_STORAGE_PATH', storage_path('app/documents')),
+    'max_upload_mb' => env('MAX_UPLOAD_MB', 25),
+
+    // Target cadence for arbitrator case updates - shared by the reminder
+    // job, the "needs update" report section, and the responsiveness
+    // scoring component, so all three agree on what "on pace" means.
+    'case_update_target_days' => env('CASE_UPDATE_TARGET_DAYS', 14),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

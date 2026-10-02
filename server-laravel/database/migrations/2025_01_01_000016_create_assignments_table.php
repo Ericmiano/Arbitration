@@ -16,7 +16,12 @@ return new class extends Migration
             $table->dateTime('assigned_at')->useCurrent();
             // Copy of case.due_date at assignment time; extensions update this copy.
             $table->date('due_date');
-            $table->enum('status', ['ongoing', 'completed', 'overdue', 'escalated', 'withdrawn', 'reassigned'])->default('ongoing');
+            // No 'overdue'/'escalated' states - completion timing outside an
+            // arbitrator's control (case complexity, party delays) shouldn't
+            // auto-flag a status or feed the score; see case_updates and the
+            // reminder job for the replacement (a responsiveness signal
+            // based on whether they keep posting updates, not raw lateness).
+            $table->enum('status', ['ongoing', 'completed', 'withdrawn', 'reassigned'])->default('ongoing');
             $table->dateTime('completed_at')->nullable();
             $table->string('withdrawal_reason', 500)->nullable();
             $table->timestamp('created_at')->useCurrent();

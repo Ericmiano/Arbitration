@@ -1,3 +1,18 @@
+<IfModule mod_headers.c>
+    # Same-origin SPA + API (see routes/web.php's fallback route) - no
+    # third-party scripts/styles/fonts (IBM Plex is self-hosted under
+    # /fonts), and the API is called same-origin under /api, so connect-src
+    # never needs an external host the way a separately-hosted SPA would.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    # Only takes effect once served over HTTPS (AutoSSL) - browsers ignore it
+    # over plain HTTP, so it's safe to leave on even before the cert exists.
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

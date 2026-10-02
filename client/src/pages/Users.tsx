@@ -1,6 +1,8 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { createUser, listUsers, updateUser, UserSummary } from '../api/users';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
+import { useAsyncList } from '../lib/useAsyncList';
 import { useAuth } from '../context/AuthContext';
 
 const EDITABLE_ROLES = ['admin', 'registrar', 'staff'];
@@ -8,15 +10,9 @@ const EDITABLE_ROLES = ['admin', 'registrar', 'staff'];
 export function Users() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
-  const [users, setUsers] = useState<UserSummary[] | null>(null);
+  const { status, data: users, reload } = useAsyncList<UserSummary>(() => listUsers());
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
-
-  function reload() {
-    listUsers().then(setUsers);
-  }
-
-  useEffect(reload, []);
 
   async function handleChange(userId: string, patch: { role?: string; status?: string }) {
     setError(null);
@@ -51,7 +47,6 @@ export function Users() {
   }
 
   function handleExport() {
-    if (!users) return;
     downloadCsv(
       `aak-users-${new Date().toISOString().slice(0, 10)}.csv`,
       [
@@ -66,15 +61,13 @@ export function Users() {
     );
   }
 
-  if (!users) return <p>Loading...</p>;
-
   return (
     <div className="bg-sheet border border-ink">
       <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-16 gap-y-10 items-end">
         <div className="flex-1 min-w-[200px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Users</h1>
           <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
-            {users.length} account{users.length === 1 ? '' : 's'}
+            {status === 'loading' ? 'Loading...' : `${users.length} account${users.length === 1 ? '' : 's'}`}
           </div>
         </div>
         <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
@@ -110,6 +103,10 @@ export function Users() {
           </button>
         </form>
       )}
+
+      {status === 'loading' && <p className="px-24 py-20 text-13">Loading...</p>}
+      {status === 'error' && <ErrorState onRetry={reload} />}
+      {status === 'empty' && <p className="px-24 py-20 text-13">No accounts to show.</p>}
 
       {users.map((u) => {
         const isEditableRole = EDITABLE_ROLES.includes(u.role);

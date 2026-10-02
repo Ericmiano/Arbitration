@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getReportsOverview, ReportsOverview } from '../api/reports';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
 
 function formatMonth(month: string): string {
@@ -21,11 +22,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function Reports() {
   const [data, setData] = useState<ReportsOverview | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    getReportsOverview().then(setData);
-  }, []);
+    setLoadError(null);
+    getReportsOverview()
+      .then(setData)
+      .catch(setLoadError);
+  }, [reloadKey]);
 
+  if (loadError) return <ErrorState onRetry={reload} />;
   if (!data) return <p>Loading...</p>;
 
   const maxMonthly = Math.max(1, ...data.caseVolumeByMonth.map((m) => m.count));

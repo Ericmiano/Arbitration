@@ -1,22 +1,17 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { listEligibleArbitrators } from '../api/arbitrators';
-import {
-  AssignmentExtension,
-  completeAssignment,
-  createAssignment,
-  decideExtension,
-  listExtensions,
-  requestExtension,
-  withdrawAssignment,
-} from '../api/assignments';
-import { confirmAgreement, getCase } from '../api/cases';
+import { AssignmentExtension, decideExtension, listExtensions, requestExtension } from '../api/assignments';
+import { confirmAgreement, getCase, getCaseTimeline } from '../api/cases';
 import { documentDownloadUrl, listDocuments, uploadDocument } from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
+import { appointMember, concludeCase, createTribunal, withdrawMember } from '../api/tribunals';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
 import { useAuth } from '../context/AuthContext';
 import {
   activeAssignment as getActiveAssignment,
+  activeTribunal,
+  activeTribunalMembers,
   buildTimeline,
   daysBetween,
   deadlineLine,
@@ -24,9 +19,24 @@ import {
   formatMoney,
   formatMonoDate,
   groupKeyForCase,
+  isTerminalGroup,
   statusTone,
 } from '../lib/caseDisplay';
-import { Arbitrator, Case, DocumentSummary, Hearing } from '../types';
+import { Arbitrator, Case, CaseEvent, DocumentSummary, Hearing, TribunalMemberRole } from '../types';
+
+const PANEL_OPEN_SEATS: Record<'sole' | 'panel', TribunalMemberRole[]> = {
+  sole: ['sole_arbitrator'],
+  panel: ['co_arbitrator', 'co_arbitrator', 'chairperson'],
+};
+
+function remainingSeats(tribunalType: 'sole' | 'panel', members: { role: TribunalMemberRole }[]): TribunalMemberRole[] {
+  const remaining = [...PANEL_OPEN_SEATS[tribunalType]];
+  for (const m of members) {
+    const idx = remaining.indexOf(m.role);
+    if (idx !== -1) remaining.splice(idx, 1);
+  }
+  return remaining;
+}
 
 const TABS = ['Overview', 'Parties', 'Project', 'Arbitrator', 'Documents', 'Hearings', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
@@ -41,6 +51,7 @@ export function CaseDetail() {
   const [hearings, setHearings] = useState<Hearing[]>([]);
   const [eligible, setEligible] = useState<Arbitrator[]>([]);
   const [extensions, setExtensions] = useState<AssignmentExtension[]>([]);
+  const [timeline, setTimeline] = useState<CaseEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('Overview');
 
@@ -57,15 +68,22 @@ export function CaseDetail() {
     });
     listDocuments(caseId).then(setDocuments);
     listHearings(caseId).then(setHearings);
+    getCaseTimeline(caseId).then(setTimeline);
   }
 
   useEffect(reload, [caseId]);
 
+  const tribunal = caseRecord ? activeTribunal(caseRecord) : undefined;
+  const tribunalIsForming = tribunal?.status === 'forming';
+
   useEffect(() => {
-    if (isStaff && caseRecord?.status === 'pending_assignment' && caseId) {
+    // Also refetches while a panel seat is vacant mid-case (tribunal
+    // "forming" again after a withdrawal) - not just while the case itself
+    // is still awaiting its first appointment.
+    if (isStaff && caseId && (caseRecord?.status === 'pending_assignment' || tribunalIsForming)) {
       listEligibleArbitrators(caseId).then(setEligible);
     }
-  }, [isStaff, caseRecord?.status, caseId]);
+  }, [isStaff, caseRecord?.status, tribunalIsForming, caseId]);
 
   useBreadcrumb(caseRecord ? `DOCKET / ${caseRecord.case_number}` : undefined);
 
@@ -73,9 +91,22 @@ export function CaseDetail() {
 
   const assignment = getActiveAssignment(caseRecord);
   const group = groupKeyForCase(caseRecord);
+  // The real procedural timeline, when this case has one (anything created
+  // or acted on after the tribunal/timeline model shipped) - falls back to
+  // the old client-side heuristic for cases with no case_events recorded
+  // yet (every case imported from AAK's historical register, and any
+  // legacy case nobody has touched since), rather than showing nothing.
+  const displayTimeline =
+    timeline.length > 0
+      ? timeline.map((e) => ({
+          date: e.event_at,
+          title: e.title,
+          meta: e.description ?? (e.actor ? `By ${e.actor.full_name}` : ''),
+          tone: 'past' as const,
+        }))
+      : buildTimeline(caseRecord);
   const isOwningArbitrator = user?.role === 'arbitrator';
-  const canActOnAssignment =
-    assignment && (isStaff || isOwningArbitrator) && ['ongoing', 'overdue', 'escalated'].includes(assignment.status);
+  const canActOnAssignment = assignment && (isStaff || isOwningArbitrator) && assignment.status === 'ongoing';
 
   async function withAsyncAction(action: () => Promise<unknown>) {
     setError(null);
@@ -109,9 +140,20 @@ export function CaseDetail() {
     await withAsyncAction(() => confirmAgreement(caseId, String(form.get('documentPublicId'))));
   }
 
-  async function handleAssign(arbitratorId: string) {
+  async function handleCreateTribunal(tribunalType: 'sole' | 'panel') {
     if (!caseId) return;
-    await withAsyncAction(() => createAssignment(caseId, arbitratorId));
+    await withAsyncAction(() => createTribunal(caseId, tribunalType));
+  }
+
+  async function handleAppointMember(arbitratorId: string, role: TribunalMemberRole) {
+    if (!tribunal) return;
+    await withAsyncAction(() => appointMember(tribunal.id, arbitratorId, role));
+  }
+
+  async function handleWithdrawMember(memberId: string) {
+    const reason = window.prompt('Reason for this arbitrator leaving the tribunal?');
+    if (!reason) return;
+    await withAsyncAction(() => withdrawMember(tribunal!.id, memberId, reason, 'withdrawn'));
   }
 
   async function handleRequestExtension(event: FormEvent<HTMLFormElement>) {
@@ -123,12 +165,12 @@ export function CaseDetail() {
     );
   }
 
-  async function handleComplete(event: FormEvent<HTMLFormElement>) {
+  async function handleConclude(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!assignment) return;
+    if (!caseId) return;
     const form = new FormData(event.currentTarget);
     await withAsyncAction(() =>
-      completeAssignment(assignment.id, {
+      concludeCase(caseId, {
         outcome: form.get('outcome') as 'award_issued' | 'settled' | 'withdrawn',
         outcomeDetail: String(form.get('outcomeDetail') || ''),
         awardChallenged: false,
@@ -139,13 +181,6 @@ export function CaseDetail() {
   async function handleDecideExtension(extensionId: string, decision: 'approved' | 'rejected') {
     if (!assignment) return;
     await withAsyncAction(() => decideExtension(assignment.id, extensionId, decision));
-  }
-
-  async function handleWithdraw() {
-    if (!assignment) return;
-    const reason = window.prompt('Reason for withdrawing this arbitrator?');
-    if (!reason) return;
-    await withAsyncAction(() => withdrawAssignment(assignment.id, reason));
   }
 
   async function handleScheduleHearing(event: FormEvent<HTMLFormElement>) {
@@ -176,7 +211,7 @@ export function CaseDetail() {
       : null;
 
   const statusLine = (() => {
-    if (group === 'closed') return `${(caseRecord.outcome ?? 'concluded').replace(/_/g, ' ').toUpperCase()}`;
+    if (group === 'closed' || group === 'withdrawn') return deadlineLine(caseRecord, group);
     if (group === 'appoint') return 'AWAITING APPOINTMENT';
     const base = deadlineLine(caseRecord, group);
     return dayCount ? `${base} · DAY ${Math.max(dayCount.elapsed, 0)} OF ${dayCount.total}` : base;
@@ -190,10 +225,10 @@ export function CaseDetail() {
             {caseRecord.case_number} · FILED {formatMonoDate(caseRecord.filed_at)}
           </div>
           <h1 className="mt-9 mb-0 text-26 font-semibold tracking-[-0.025em] leading-[1.2]">
-            {caseRecord.case_parties.find((p) => p.role === 'claimant')?.parties.full_name ?? 'Claimant'}
+            {caseRecord.parties.find((p) => p.pivot.role === 'claimant')?.full_name ?? 'Claimant'}
             <br />
             <span className="font-normal text-17 text-muted">v.</span>{' '}
-            {caseRecord.case_parties.find((p) => p.role === 'respondent')?.parties.full_name ?? 'Respondent'}
+            {caseRecord.parties.find((p) => p.pivot.role === 'respondent')?.full_name ?? 'Respondent'}
           </h1>
           <div className={`mt-10 flex items-center gap-8 font-mono text-11 tracking-[0.08em] ${statusTone(group)}`}>
             <span className={`w-7 h-7 inline-block ${statusTone(group).replace('text-', 'bg-')}`} />
@@ -215,7 +250,7 @@ export function CaseDetail() {
           >
             Schedule hearing
           </button>
-          {group !== 'closed' && (
+          {!isTerminalGroup(group) && (
             <button
               type="button"
               onClick={() => setTab('Arbitrator')}
@@ -259,7 +294,7 @@ export function CaseDetail() {
               PROCEDURAL HISTORY
             </div>
             <div className="px-18 pt-15 pb-18">
-              {buildTimeline(caseRecord).map((e, i) => (
+              {displayTimeline.map((e, i) => (
                 <div key={i} className="flex gap-10">
                   <span className="flex-[0_0_62px] font-mono text-10 tracking-[0.04em] text-muted pt-2">
                     {formatMonoDate(e.date)}
@@ -291,10 +326,10 @@ export function CaseDetail() {
 
       {tab === 'Parties' && (
         <div className="px-20 py-16">
-          {caseRecord.case_parties.map((cp) => (
-            <div key={cp.party_id} className="py-10 border-t border-hairline first:border-t-0">
-              <span className="font-mono text-9.5 tracking-[0.1em] text-muted uppercase">{cp.role}</span>
-              <div className="text-15 font-semibold">{cp.parties.full_name}</div>
+          {caseRecord.parties.map((p) => (
+            <div key={p.id} className="py-10 border-t border-hairline first:border-t-0">
+              <span className="font-mono text-9.5 tracking-[0.1em] text-muted uppercase">{p.pivot.role}</span>
+              <div className="text-15 font-semibold">{p.full_name}</div>
             </div>
           ))}
         </div>
@@ -302,10 +337,10 @@ export function CaseDetail() {
 
       {tab === 'Project' && (
         <div className="px-20 py-16 text-13.5">
-          {caseRecord.projects ? (
+          {caseRecord.project ? (
             <>
-              <div className="text-15 font-semibold">{caseRecord.projects.name}</div>
-              <div className="mt-4 text-ink-2">{caseRecord.projects.location}</div>
+              <div className="text-15 font-semibold">{caseRecord.project.name}</div>
+              <div className="mt-4 text-ink-2">{caseRecord.project.location}</div>
             </>
           ) : (
             <p className="text-muted">No project linked to this case.</p>
@@ -337,8 +372,131 @@ export function CaseDetail() {
             </div>
           )}
 
-          {assignment ? (
-            <div>
+          {!tribunal && isStaff && caseRecord.status === 'pending_assignment' && (
+            <div className="pb-20 border-b border-rule">
+              <div className="font-mono text-9.5 tracking-[0.12em] text-muted">CONSTITUTE TRIBUNAL</div>
+              <p className="mt-8 text-13 text-ink-2">
+                A sole arbitrator decides alone; a 3-member panel has two co-arbitrators and a chairperson.
+              </p>
+              <div className="mt-8 flex gap-8">
+                <button
+                  type="button"
+                  onClick={() => handleCreateTribunal('sole')}
+                  className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band"
+                >
+                  Sole arbitrator
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateTribunal('panel')}
+                  className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band"
+                >
+                  3-member panel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tribunal ? (
+            <div className="mt-20">
+              <div className="font-mono text-9.5 tracking-[0.12em] text-muted">
+                {tribunal.tribunal_type === 'sole' ? 'SOLE ARBITRATOR' : 'ARBITRAL PANEL'} · {tribunal.status.toUpperCase()}
+              </div>
+              <div className="mt-8">
+                {tribunal.members.map((m) => {
+                  const isMemberActive = ['nominated', 'appointed', 'accepted'].includes(m.status);
+                  return (
+                    <div key={m.id} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap items-baseline gap-x-16 gap-y-4">
+                      <Link to={`/arbitrators/${m.arbitrator_id}`} className="flex-[1_1_200px] text-14 font-semibold text-ink hover:text-red">
+                        {m.arbitrator.full_name}
+                      </Link>
+                      <span className="font-mono text-10.5 text-muted uppercase">{m.role.replace(/_/g, ' ')}</span>
+                      <span
+                        className={`font-mono text-10.5 uppercase ${
+                          isMemberActive ? 'text-green' : ['withdrawn', 'removed', 'recused'].includes(m.status) ? 'text-muted-2' : 'text-amber'
+                        }`}
+                      >
+                        {m.status}
+                      </span>
+                      {isStaff && isMemberActive && tribunal.status !== 'dissolved' && (
+                        <button
+                          type="button"
+                          onClick={() => handleWithdrawMember(m.id)}
+                          className="ml-auto min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                        >
+                          Withdraw
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {tribunal.status === 'forming' && isStaff && (
+                <div className="mt-20 pt-16 border-t border-rule">
+                  <div className="font-mono text-9.5 tracking-[0.12em] text-muted">
+                    OPEN SEAT{remainingSeats(tribunal.tribunal_type, activeTribunalMembers(caseRecord)).length === 1 ? '' : 'S'}:{' '}
+                    {[...new Set(remainingSeats(tribunal.tribunal_type, activeTribunalMembers(caseRecord)))]
+                      .map((r) => r.replace(/_/g, ' '))
+                      .join(', ')
+                      .toUpperCase()}
+                  </div>
+                  {eligible.length === 0 ? (
+                    <p className="mt-8 text-13 text-muted">No conflict-free active arbitrators available.</p>
+                  ) : (
+                    <div className="mt-8">
+                      {eligible.map((a) => (
+                        <div key={a.id} className="py-10 border-t border-hairline flex flex-wrap items-baseline gap-x-16 gap-y-4">
+                          <span className="flex-[1_1_200px] text-13.5 font-medium">{a.full_name}</span>
+                          <span className="font-mono text-10.5 text-muted">SCORE {a.score}</span>
+                          <span className="font-mono text-10.5 text-muted">{a.cases_closed_count} CLOSED</span>
+                          {a.priorEngagementFlags && a.priorEngagementFlags.length > 0 && (
+                            <span className="font-mono text-10.5 text-amber">PRIOR ENGAGEMENT</span>
+                          )}
+                          <div className="ml-auto flex gap-6">
+                            {[...new Set(remainingSeats(tribunal.tribunal_type, activeTribunalMembers(caseRecord)))].map((role) => (
+                              <button
+                                key={role}
+                                type="button"
+                                onClick={() => handleAppointMember(a.id, role)}
+                                className="min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
+                              >
+                                {tribunal.tribunal_type === 'sole' ? 'Appoint' : `Appoint as ${role.replace(/_/g, ' ')}`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tribunal.status === 'constituted' && (isStaff || isOwningArbitrator) && (
+                <form onSubmit={handleConclude} className="mt-20 pt-16 border-t border-rule max-w-[420px]">
+                  <div className="font-mono text-9.5 tracking-[0.12em] text-muted">RECORD OUTCOME</div>
+                  <select name="outcome" required defaultValue="award_issued" className="mt-8 w-full border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+                    <option value="award_issued">Award issued</option>
+                    <option value="settled">Settled</option>
+                    <option value="withdrawn">Withdrawn</option>
+                  </select>
+                  <textarea
+                    name="outcomeDetail"
+                    placeholder="Outcome details"
+                    rows={3}
+                    className="mt-8 w-full border border-rule bg-transparent p-8 text-13 outline-none"
+                  />
+                  <button type="submit" className="mt-8 min-h-[31px] px-14 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover">
+                    Mark concluded
+                  </button>
+                </form>
+              )}
+            </div>
+          ) : assignment ? (
+            // A case whose arbitrator predates the tribunal model on it (or
+            // whose tribunal has since fully dissolved) - the plain
+            // assignment record it still has.
+            <div className="mt-20">
               <div className="flex flex-wrap gap-x-18 gap-y-8 items-baseline">
                 <Link to={`/arbitrators/${assignment.arbitrator_id}`} className="text-16 font-semibold text-ink hover:text-red">
                   {assignment.arbitrators.full_name}
@@ -346,128 +504,71 @@ export function CaseDetail() {
                 <span className="font-mono text-10.5 text-muted uppercase">{assignment.status}</span>
                 <span className="font-mono text-10.5 text-muted-2">due {formatMonoDate(assignment.due_date)}</span>
               </div>
-
-              {canActOnAssignment && (
-                <>
-                  <form onSubmit={handleRequestExtension} className="mt-20 pt-16 border-t border-rule max-w-[420px]">
-                    <div className="font-mono text-9.5 tracking-[0.12em] text-muted">REQUEST EXTENSION</div>
-                    <div className="mt-8 flex flex-wrap gap-8">
-                      <input name="reason" placeholder="Reason" required className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
-                      <input name="requestedDueDate" type="date" required className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
-                      <button type="submit" className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
-                        Request
-                      </button>
-                    </div>
-                  </form>
-
-                  {extensions.length > 0 && (
-                    <div className="mt-20 pt-16 border-t border-rule max-w-[420px]">
-                      <div className="font-mono text-9.5 tracking-[0.12em] text-muted">EXTENSION REQUESTS</div>
-                      <div className="mt-8">
-                        {extensions.map((ext) => (
-                          <div key={ext.id} className="py-8 border-t border-hairline first:border-t-0">
-                            <div className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
-                              <span className="text-13">{ext.reason}</span>
-                              <span className="font-mono text-10.5 text-muted-2">
-                                new due {formatMonoDate(ext.new_due_date)}
-                              </span>
-                              <span
-                                className={`font-mono text-10.5 uppercase ml-auto ${
-                                  ext.status === 'pending'
-                                    ? 'text-amber'
-                                    : ext.status === 'approved'
-                                      ? 'text-green'
-                                      : 'text-muted-2'
-                                }`}
-                              >
-                                {ext.status}
-                              </span>
-                            </div>
-                            {isStaff && ext.status === 'pending' && (
-                              <div className="mt-6 flex gap-8">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDecideExtension(ext.id, 'approved')}
-                                  className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDecideExtension(ext.id, 'rejected')}
-                                  className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleComplete} className="mt-20 pt-16 border-t border-rule max-w-[420px]">
-                    <div className="font-mono text-9.5 tracking-[0.12em] text-muted">RECORD OUTCOME</div>
-                    <select name="outcome" required defaultValue="award_issued" className="mt-8 w-full border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
-                      <option value="award_issued">Award issued</option>
-                      <option value="settled">Settled</option>
-                      <option value="withdrawn">Withdrawn</option>
-                    </select>
-                    <textarea
-                      name="outcomeDetail"
-                      placeholder="Outcome details"
-                      rows={3}
-                      className="mt-8 w-full border border-rule bg-transparent p-8 text-13 outline-none"
-                    />
-                    <button type="submit" className="mt-8 min-h-[31px] px-14 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover">
-                      Mark completed
-                    </button>
-                  </form>
-
-                  {isStaff && (
-                    <button
-                      type="button"
-                      onClick={handleWithdraw}
-                      className="mt-16 bg-transparent border-0 border-b border-ink py-2 text-12.5 cursor-pointer hover:text-red hover:border-red"
-                    >
-                      Withdraw arbitrator
-                    </button>
-                  )}
-                </>
-              )}
             </div>
           ) : (
-            <p className="text-13 text-muted">No arbitrator assigned yet.</p>
+            <p className="mt-20 text-13 text-muted">No arbitrator assigned yet.</p>
           )}
 
-          {isStaff && caseRecord.status === 'pending_assignment' && (
-            <div className="mt-20 pt-16 border-t border-rule">
-              <div className="font-mono text-9.5 tracking-[0.12em] text-muted">ELIGIBLE ARBITRATORS</div>
-              {eligible.length === 0 ? (
-                <p className="mt-8 text-13 text-muted">No conflict-free active arbitrators available.</p>
-              ) : (
-                <div className="mt-8">
-                  {eligible.map((a) => (
-                    <div key={a.id} className="py-10 border-t border-hairline flex flex-wrap items-baseline gap-x-16 gap-y-4">
-                      <span className="flex-[1_1_200px] text-13.5 font-medium">{a.full_name}</span>
-                      <span className="font-mono text-10.5 text-muted">SCORE {a.score}</span>
-                      <span className="font-mono text-10.5 text-muted">{a.cases_closed_count} CLOSED</span>
-                      {a.priorEngagementFlags && a.priorEngagementFlags.length > 0 && (
-                        <span className="font-mono text-10.5 text-amber">PRIOR ENGAGEMENT</span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleAssign(a.id)}
-                        className="ml-auto min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
-                      >
-                        Assign
-                      </button>
-                    </div>
-                  ))}
+          {canActOnAssignment && (
+            <>
+              <form onSubmit={handleRequestExtension} className="mt-20 pt-16 border-t border-rule max-w-[420px]">
+                <div className="font-mono text-9.5 tracking-[0.12em] text-muted">REQUEST EXTENSION</div>
+                <div className="mt-8 flex flex-wrap gap-8">
+                  <input name="reason" placeholder="Reason" required className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+                  <input name="requestedDueDate" type="date" required className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+                  <button type="submit" className="min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+                    Request
+                  </button>
+                </div>
+              </form>
+
+              {extensions.length > 0 && (
+                <div className="mt-20 pt-16 border-t border-rule max-w-[420px]">
+                  <div className="font-mono text-9.5 tracking-[0.12em] text-muted">EXTENSION REQUESTS</div>
+                  <div className="mt-8">
+                    {extensions.map((ext) => (
+                      <div key={ext.id} className="py-8 border-t border-hairline first:border-t-0">
+                        <div className="flex flex-wrap items-baseline gap-x-10 gap-y-4">
+                          <span className="text-13">{ext.reason}</span>
+                          <span className="font-mono text-10.5 text-muted-2">
+                            new due {formatMonoDate(ext.new_due_date)}
+                          </span>
+                          <span
+                            className={`font-mono text-10.5 uppercase ml-auto ${
+                              ext.status === 'pending'
+                                ? 'text-amber'
+                                : ext.status === 'approved'
+                                  ? 'text-green'
+                                  : 'text-muted-2'
+                            }`}
+                          >
+                            {ext.status}
+                          </span>
+                        </div>
+                        {isStaff && ext.status === 'pending' && (
+                          <div className="mt-6 flex gap-8">
+                            <button
+                              type="button"
+                              onClick={() => handleDecideExtension(ext.id, 'approved')}
+                              className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDecideExtension(ext.id, 'rejected')}
+                              className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
@@ -610,7 +711,7 @@ export function CaseDetail() {
 
       {tab === 'Activity' && (
         <div className="px-20 py-16">
-          {buildTimeline(caseRecord).map((e, i) => (
+          {displayTimeline.map((e, i) => (
             <div key={i} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-4 items-baseline">
               <span className="font-mono text-10.5 text-muted flex-[0_0_90px]">{formatMonoDate(e.date)}</span>
               <span className="flex-1 text-13.5 font-medium">{e.title}</span>
@@ -626,16 +727,16 @@ export function CaseDetail() {
 function Titleblock({ caseRecord }: { caseRecord: Case }) {
   const contractClause = caseRecord.basis === 'contractual_clause' ? 'Contractual clause' : 'Mutual agreement';
   const fields: Array<{ label: string; value: string; note?: string; mono?: boolean; tone?: string }> = [
-    { label: 'Project', value: caseRecord.projects?.name ?? 'Not linked', note: caseRecord.projects?.location ?? undefined },
+    { label: 'Project', value: caseRecord.project?.name ?? 'Not linked', note: caseRecord.project?.location ?? undefined },
     { label: 'Dispute value', value: formatMoney(caseRecord.dispute_value, caseRecord.currency), mono: true },
     { label: 'Category', value: caseRecord.category },
     {
       label: 'Claimant',
-      value: caseRecord.case_parties.find((p) => p.role === 'claimant')?.parties.full_name ?? '—',
+      value: caseRecord.parties.find((p) => p.pivot.role === 'claimant')?.full_name ?? '—',
     },
     {
       label: 'Respondent',
-      value: caseRecord.case_parties.find((p) => p.role === 'respondent')?.parties.full_name ?? '—',
+      value: caseRecord.parties.find((p) => p.pivot.role === 'respondent')?.full_name ?? '—',
     },
     { label: 'Basis for arbitration', value: contractClause },
     { label: 'SLA tier', value: caseRecord.sla_tier, mono: true },

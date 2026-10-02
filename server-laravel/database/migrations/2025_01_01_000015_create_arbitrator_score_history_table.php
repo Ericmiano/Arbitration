@@ -13,7 +13,11 @@ return new class extends Migration
             $table->foreignId('arbitrator_id')->constrained('arbitrators')->cascadeOnDelete();
             $table->foreignId('case_id')->nullable()->constrained('cases')->nullOnDelete();
             $table->decimal('score', 5, 2);
-            $table->decimal('timeliness_component', 5, 2);
+            // Renamed from timeliness_component: measures whether the
+            // arbitrator kept posting case updates on a reasonable cadence,
+            // not whether the case itself finished by its due date -
+            // completion speed is often outside their control.
+            $table->decimal('responsiveness_component', 5, 2);
             $table->decimal('outcome_component', 5, 2);
             $table->decimal('workload_component', 5, 2);
             $table->dateTime('calculated_at')->useCurrent();

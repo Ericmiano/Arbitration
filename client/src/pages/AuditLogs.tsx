@@ -1,27 +1,27 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { listAuditLogs } from '../api/auditLogs';
+import { ErrorState } from '../components/ErrorState';
 import { downloadCsv } from '../lib/csv';
+import { useAsyncList } from '../lib/useAsyncList';
 import { AuditLogEntry } from '../types';
 
 export function AuditLogs() {
-  const [logs, setLogs] = useState<AuditLogEntry[] | null>(null);
   const [action, setAction] = useState('');
   const [entityType, setEntityType] = useState('');
+  const [appliedFilters, setAppliedFilters] = useState<{ action?: string; entityType?: string }>({});
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  function reload(filters: { action?: string; entityType?: string } = {}) {
-    listAuditLogs(filters).then(setLogs);
-  }
-
-  useEffect(() => reload(), []);
+  const { status, data: logs, reload } = useAsyncList<AuditLogEntry>(
+    () => listAuditLogs(appliedFilters),
+    [appliedFilters],
+  );
 
   function handleFilter(event: FormEvent) {
     event.preventDefault();
-    reload({ action: action || undefined, entityType: entityType || undefined });
+    setAppliedFilters({ action: action || undefined, entityType: entityType || undefined });
   }
 
   function handleExport() {
-    if (!logs) return;
     downloadCsv(
       `aak-audit-log-${new Date().toISOString().slice(0, 10)}.csv`,
       [
@@ -37,15 +37,13 @@ export function AuditLogs() {
     );
   }
 
-  if (!logs) return <p>Loading...</p>;
-
   return (
     <div className="bg-sheet border border-ink">
       <div className="px-24 pt-22 pb-18 border-b border-ink flex flex-wrap gap-x-16 gap-y-10 items-end">
         <div className="flex-1 min-w-[200px]">
           <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Audit log</h1>
           <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted uppercase">
-            {logs.length} event{logs.length === 1 ? '' : 's'} · most recent 500
+            {status === 'loading' ? 'Loading...' : `${logs.length} event${logs.length === 1 ? '' : 's'} · most recent 500`}
           </div>
         </div>
         <button type="button" onClick={handleExport} className="min-h-[31px] px-12 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
@@ -71,7 +69,11 @@ export function AuditLogs() {
         </button>
       </form>
 
-      {logs.length === 0 ? (
+      {status === 'loading' ? (
+        <p className="px-24 py-20 text-13">Loading...</p>
+      ) : status === 'error' ? (
+        <ErrorState onRetry={reload} />
+      ) : status === 'empty' ? (
         <p className="px-24 py-20 text-13 text-muted">No matching events.</p>
       ) : (
         logs.map((log) => {

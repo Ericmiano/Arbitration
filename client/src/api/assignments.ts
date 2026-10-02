@@ -1,9 +1,10 @@
 import { apiClient } from './client';
 
-export async function createAssignment(caseId: string, arbitratorId: string): Promise<void> {
-  await apiClient.post('/assignments', { caseId, arbitratorId });
-}
-
+/**
+ * Just the per-assignment due-date extension machinery -
+ * appointing/withdrawing/concluding a case's arbitrator(s) moved to
+ * api/tribunals.ts (see TribunalController on the backend).
+ */
 export async function requestExtension(
   assignmentId: string,
   reason: string,
@@ -36,18 +37,4 @@ export async function decideExtension(
   decision: 'approved' | 'rejected',
 ): Promise<void> {
   await apiClient.patch(`/assignments/${assignmentId}/extensions/${extensionId}`, { decision });
-}
-
-export interface CompleteAssignmentInput {
-  outcome: 'award_issued' | 'settled' | 'withdrawn';
-  outcomeDetail?: string;
-  awardChallenged?: boolean;
-}
-
-export async function completeAssignment(assignmentId: string, input: CompleteAssignmentInput): Promise<void> {
-  await apiClient.post(`/assignments/${assignmentId}/complete`, input);
-}
-
-export async function withdrawAssignment(assignmentId: string, reason: string): Promise<void> {
-  await apiClient.post(`/assignments/${assignmentId}/withdraw`, { reason });
 }

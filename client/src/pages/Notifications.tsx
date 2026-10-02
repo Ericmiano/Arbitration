@@ -1,19 +1,14 @@
-import { useEffect, useState } from 'react';
 import { listNotifications, markNotificationRead } from '../api/notifications';
+import { ErrorState } from '../components/ErrorState';
+import { useAsyncList } from '../lib/useAsyncList';
 import { AppNotification } from '../types';
 
 export function Notifications() {
-  const [notifications, setNotifications] = useState<AppNotification[] | null>(null);
-
-  function reload() {
-    listNotifications().then(setNotifications);
-  }
-
-  useEffect(reload, []);
+  const { status, data: notifications, reload, setData } = useAsyncList<AppNotification>(() => listNotifications());
 
   async function handleMarkRead(id: string) {
     await markNotificationRead(id);
-    setNotifications((prev) => prev?.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)) ?? null);
+    setData((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
   }
 
   return (
@@ -21,13 +16,15 @@ export function Notifications() {
       <div className="px-24 pt-22 pb-18 border-b border-ink">
         <h1 className="m-0 text-27 font-semibold tracking-[-0.025em]">Notifications</h1>
         <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">
-          {notifications ? `${notifications.filter((n) => !n.read_at).length} UNREAD` : 'LOADING...'}
+          {status === 'loading' ? 'LOADING...' : `${notifications.filter((n) => !n.read_at).length} UNREAD`}
         </div>
       </div>
 
-      {notifications === null ? (
+      {status === 'loading' ? (
         <p className="px-24 py-20 text-13">Loading...</p>
-      ) : notifications.length === 0 ? (
+      ) : status === 'error' ? (
+        <ErrorState onRetry={reload} />
+      ) : status === 'empty' ? (
         <p className="px-24 py-20 text-13">Nothing to show.</p>
       ) : (
         notifications.map((n) => (

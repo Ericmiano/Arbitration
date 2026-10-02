@@ -1,0 +1,62 @@
+---
+# cPanel Git(tm) Version Control deploy script. Runs as shell tasks under
+# the cPanel account when you click "Deploy HEAD Commit" (or on push, if
+# you wire that up) - no SSH session needed, .cpanel.yml is exactly the
+# mechanism cPanel gives you for that.
+#
+# Topology this assumes (see DEPLOYMENT.md for the full writeup and the
+# public_html-only fallback if your plan won't let you set a custom
+# Document Root):
+#   - This repo is cloned by cPanel's Git feature to a PRIVATE path outside
+#     any web root, e.g. /home/<user>/repositories/aak-arbitration - never
+#     point a domain's Document Root at that checkout directly, since it
+#     contains .git, source, and (after the copy below) nothing sensitive,
+#     but there's no reason to expose it either.
+#   - The tasks below copy server-laravel/ into a separate, PERSISTENT live
+#     app directory ($LIVE_APP_PATH) and run migrations - leaving .env and
+#     storage/ alone on every redeploy.
+#   - The subdomain hosting this app has its Document Root set to
+#     $LIVE_APP_PATH/public in cPanel (Domains) - that's the one thing this
+#     file can't do for you. The main domain stays on public_html
+#     untouched, since this plan can't give it a custom Document Root.
+#   - The frontend is already built and staged into server-laravel/public/
+#     (scripts/build-frontend-for-deploy.sh) and vendor/ is already a
+#     production build (scripts/prepare-backend-for-deploy.sh) *before* you
+#     commit and push - cPanel has no Node.js, and Composer's availability
+#     on this plan is unconfirmed (no SSH/Terminal to check), so neither
+#     step depends on anything being installed server-side.
+#
+# Before the first deploy: fill in LIVE_APP_PATH below, create the live app
+# directory once, and place a real .env there (never committed to git).
+deployment:
+  tasks:
+    - export LIVE_APP_PATH=/home/$USER/aak-laravel
+    - export REPO_PATH=$PWD
+
+    # --- Sync app files, preserving .env and storage/ across deploys ---
+    - /bin/mkdir -p $LIVE_APP_PATH
+    - /usr/bin/rsync -a --delete
+        --exclude='.env'
+        --exclude='storage/'
+        --exclude='node_modules/'
+        --exclude='.git/'
+        $REPO_PATH/server-laravel/ $LIVE_APP_PATH/
+
+    # First-ever deploy only: copy the storage skeleton once, then leave it
+    # alone (the --exclude above protects it on every deploy after this).
+    - '[ -d $LIVE_APP_PATH/storage ] || /bin/cp -R $REPO_PATH/server-laravel/storage $LIVE_APP_PATH/storage'
+
+    # --- Dependencies ---
+    # No `composer install` here - vendor/ is committed pre-built (see
+    # scripts/prepare-backend-for-deploy.sh), so it arrived with the rsync
+    # above already. Once Composer's availability on this host is
+    # confirmed, this can switch to installing at deploy time instead.
+
+    # --- Laravel bootstrap ---
+    - cd $LIVE_APP_PATH && php artisan migrate --force
+    - cd $LIVE_APP_PATH && php artisan config:cache
+    - cd $LIVE_APP_PATH && php artisan route:cache
+    - cd $LIVE_APP_PATH && php artisan event:cache
+
+    # --- Permissions (Laravel needs to write here) ---
+    - /bin/chmod -R 775 $LIVE_APP_PATH/storage $LIVE_APP_PATH/bootstrap/cache

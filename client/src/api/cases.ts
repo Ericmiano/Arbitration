@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Case } from '../types';
+import { Case, CaseEvent } from '../types';
 
 export interface CreateCaseInput {
   projectId?: number;
@@ -12,8 +12,22 @@ export interface CreateCaseInput {
   parties: Array<{ partyId: number; role: 'claimant' | 'respondent' | 'other' }>;
 }
 
-export async function listCases(q?: string): Promise<Case[]> {
-  const { data } = await apiClient.get('/cases', { params: q ? { q } : undefined });
+export interface CasesPage {
+  data: Case[];
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  perPage: number;
+}
+
+export interface ListCasesParams {
+  q?: string;
+  page?: number;
+  perPage?: number;
+}
+
+export async function listCases(params: ListCasesParams = {}): Promise<CasesPage> {
+  const { data } = await apiClient.get('/cases', { params });
   return data;
 }
 
@@ -29,5 +43,10 @@ export async function createCase(input: CreateCaseInput): Promise<Case> {
 
 export async function confirmAgreement(caseId: string, documentPublicId: string): Promise<Case> {
   const { data } = await apiClient.patch(`/cases/${caseId}/confirm-agreement`, { documentPublicId });
+  return data;
+}
+
+export async function getCaseTimeline(caseId: string): Promise<CaseEvent[]> {
+  const { data } = await apiClient.get(`/cases/${caseId}/timeline`);
   return data;
 }

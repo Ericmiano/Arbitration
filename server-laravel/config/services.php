@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    // Powers DocumentAiService's case-document scanning to assist
+    // arbitrator assignment. Entirely optional - left blank, the feature
+    // silently no-ops rather than erroring.
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-sonnet-5'),
+    ],
+
 ];

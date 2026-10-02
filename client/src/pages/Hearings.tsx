@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listHearings, updateHearing } from '../api/hearings';
+import { ErrorState } from '../components/ErrorState';
 import { useAuth } from '../context/AuthContext';
+import { useAsyncList } from '../lib/useAsyncList';
 import { Hearing } from '../types';
 
 function formatWhen(iso: string): string {
@@ -30,27 +32,22 @@ function statusTone(status: Hearing['status']): string {
 export function Hearings() {
   const { user } = useAuth();
   const isStaff = user?.role === 'admin' || user?.role === 'registrar' || user?.role === 'staff';
-  const [hearings, setHearings] = useState<Hearing[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { status, data: hearings, reload } = useAsyncList<Hearing>(() => listHearings());
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  function reload() {
-    listHearings().then(setHearings);
-  }
-
-  useEffect(reload, []);
-
-  async function handleStatusChange(hearingId: string, status: Hearing['status']) {
-    setError(null);
+  async function handleStatusChange(hearingId: string, newStatus: Hearing['status']) {
+    setMutationError(null);
     try {
-      await updateHearing(hearingId, { status });
+      await updateHearing(hearingId, { status: newStatus });
       reload();
     } catch (err) {
       const message = (err as { response?: { data?: { error?: unknown } } }).response?.data?.error;
-      setError(typeof message === 'string' ? message : 'Could not update the hearing.');
+      setMutationError(typeof message === 'string' ? message : 'Could not update the hearing.');
     }
   }
 
-  if (!hearings) return <p>Loading...</p>;
+  if (status === 'loading') return <p>Loading...</p>;
+  if (status === 'error') return <ErrorState onRetry={reload} />;
 
   const now = Date.now();
   const upcoming = hearings
@@ -69,7 +66,7 @@ export function Hearings() {
         </div>
       </div>
 
-      {error && <p className="px-24 pt-14 text-13 text-red">{error}</p>}
+      {mutationError && <p className="px-24 pt-14 text-13 text-red">{mutationError}</p>}
 
       <div className="px-24 pt-18 pb-6 font-mono text-9.5 tracking-[0.12em] text-muted">UPCOMING</div>
       {upcoming.length === 0 ? (

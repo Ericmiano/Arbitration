@@ -49,11 +49,19 @@ export type CaseStatus =
   | 'closed'
   | 'withdrawn';
 
+/**
+ * A case's party, as Eloquent's belongsToMany actually serializes it: the
+ * party itself, with the pivot (case_id/party_id/role) nested inside -
+ * this is the party record, not a join-row wrapping one.
+ */
 export interface CaseParty {
-  case_id: string;
-  party_id: string;
-  role: 'claimant' | 'respondent' | 'other';
-  parties: { id: string; full_name: string };
+  id: string;
+  full_name: string;
+  pivot: {
+    case_id: string;
+    party_id: string;
+    role: 'claimant' | 'respondent' | 'other';
+  };
 }
 
 export interface AssignmentSummary {
@@ -74,6 +82,49 @@ export interface ArbitratorAssignment {
   cases: { id: string; case_number: string; status: string; outcome: string | null };
 }
 
+export type TribunalType = 'sole' | 'panel';
+export type TribunalStatus = 'forming' | 'constituted' | 'dissolved';
+export type TribunalMemberRole = 'sole_arbitrator' | 'co_arbitrator' | 'chairperson';
+export type TribunalMemberStatus =
+  | 'nominated'
+  | 'appointed'
+  | 'accepted'
+  | 'challenged'
+  | 'recused'
+  | 'withdrawn'
+  | 'removed'
+  | 'replaced';
+
+export interface TribunalMember {
+  id: string;
+  tribunal_id: string;
+  arbitrator_id: string;
+  role: TribunalMemberRole;
+  status: TribunalMemberStatus;
+  notes: string | null;
+  replaced_member_id: string | null;
+  arbitrator: { id: string; full_name: string };
+}
+
+export interface Tribunal {
+  id: string;
+  case_id: string;
+  tribunal_type: TribunalType;
+  status: TribunalStatus;
+  constituted_at: string | null;
+  dissolved_at: string | null;
+  members: TribunalMember[];
+}
+
+export interface CaseEvent {
+  id: string;
+  event_type: string;
+  event_at: string;
+  title: string;
+  description: string | null;
+  actor: { id: string; full_name: string; email: string } | null;
+}
+
 export interface Case {
   id: string;
   public_id: string;
@@ -91,9 +142,11 @@ export interface Case {
   outcome: string | null;
   outcome_detail: string | null;
   award_challenged: boolean | null;
-  case_parties: CaseParty[];
+  parties: CaseParty[];
   assignments: AssignmentSummary[];
-  projects: { id: string; name: string; location: string | null } | null;
+  /** The tribunal currently forming/constituted for this case, if any - at most one element. */
+  active_tribunal: Tribunal[];
+  project: { id: string; name: string; location: string | null } | null;
 }
 
 export interface Arbitrator {
@@ -111,10 +164,10 @@ export interface Arbitrator {
   status: 'active' | 'inactive' | 'suspended';
   score: string;
   cases_closed_count: number;
-  arbitrator_specializations: { specialization: string }[];
-  arbitrator_qualifications?: { id: string; qualification: string }[];
-  arbitrator_registrations?: { id: string; body: string; registration_number: string | null }[];
-  arbitrator_conflicts?: { id: string; reason: string; expires_at: string | null }[];
+  specializations: { specialization: string }[];
+  qualifications?: { id: string; qualification: string }[];
+  registrations?: { id: string; body: string; registration_number: string | null }[];
+  conflicts?: { id: string; reason: string; expires_at: string | null }[];
   /** Bare shape from GET /arbitrators (list) - use ArbitratorProfile for GET /arbitrators/:id. */
   assignments?: Array<{ id: string; case_id: string; status: string; due_date: string }>;
   priorEngagementFlags?: Array<{ caseId: number; caseNumber: string; partyId: number }>;
