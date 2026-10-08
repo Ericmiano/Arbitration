@@ -231,6 +231,7 @@ export interface DocumentSummary {
   visibility: string;
   uploadedBy: string;
   scanStatus: string;
+  version: number;
   createdAt: string;
   /** Present when listed via the cross-case register (no caseId filter). */
   caseId?: string;

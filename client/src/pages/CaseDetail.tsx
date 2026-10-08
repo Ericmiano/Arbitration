@@ -16,7 +16,7 @@ import {
   requestDeadlineExtension,
   updateDeadlineStatus,
 } from '../api/deadlines';
-import { documentDownloadUrl, listDocuments, uploadDocument } from '../api/documents';
+import { documentDownloadUrl, listDocuments, uploadDocument, uploadDocumentVersion } from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
 import { appointMember, concludeCase, createTribunal, withdrawMember } from '../api/tribunals';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
@@ -67,6 +67,7 @@ export function CaseDetail() {
   const [timeline, setTimeline] = useState<CaseEvent[]>([]);
   const [filings, setFilings] = useState<Filing[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [replacingDoc, setReplacingDoc] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('Overview');
 
@@ -147,6 +148,19 @@ export function CaseDetail() {
     await withAsyncAction(async () => {
       await uploadDocument(caseId, typeInput.value, file);
       form.reset();
+    });
+  }
+
+  async function handleReplaceDocument(event: FormEvent<HTMLFormElement>, publicId: string) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const fileInput = form.elements.namedItem('file') as HTMLInputElement;
+    const reasonInput = form.elements.namedItem('changeReason') as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    await withAsyncAction(async () => {
+      await uploadDocumentVersion(publicId, file, reasonInput.value || undefined);
+      setReplacingDoc(null);
     });
   }
 
@@ -614,19 +628,48 @@ export function CaseDetail() {
 
           <div className="mt-14">
             {documents.map((doc) => (
-              <div key={doc.publicId} className="py-11 border-t border-hairline flex flex-wrap gap-x-16 gap-y-6 items-baseline">
-                <span className="flex-[1_1_250px] min-w-0 text-13.5 font-medium">{doc.fileName}</span>
-                <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">
-                  {doc.documentType.replace(/_/g, ' ').toUpperCase()}
-                </span>
-                <span className="flex-[0_0_132px] font-mono text-10 tracking-[0.09em] text-muted-2">
-                  {doc.visibility.replace(/_/g, ' ').toUpperCase()}
-                </span>
-                <span className="basis-full text-12 text-muted">
-                  {new Date(doc.createdAt).toLocaleString()} ·{' '}
-                  <a href={documentDownloadUrl(doc.publicId)}>Download</a>
-                  {doc.documentType === 'submission_agreement' && <> · ID: {doc.publicId}</>}
-                </span>
+              <div key={doc.publicId} className="py-11 border-t border-hairline">
+                <div className="flex flex-wrap gap-x-16 gap-y-6 items-baseline">
+                  <span className="flex-[1_1_250px] min-w-0 text-13.5 font-medium">{doc.fileName}</span>
+                  <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">
+                    {doc.documentType.replace(/_/g, ' ').toUpperCase()}
+                  </span>
+                  <span className="flex-[0_0_132px] font-mono text-10 tracking-[0.09em] text-muted-2">
+                    {doc.visibility.replace(/_/g, ' ').toUpperCase()}
+                  </span>
+                  {doc.version > 1 && (
+                    <span className="font-mono text-10 tracking-[0.09em] text-amber">V{doc.version}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setReplacingDoc(replacingDoc === doc.publicId ? null : doc.publicId)}
+                    className="ml-auto bg-transparent border-0 border-b border-ink py-2 text-11.5 cursor-pointer hover:text-red hover:border-red"
+                  >
+                    Replace
+                  </button>
+                  <span className="basis-full text-12 text-muted">
+                    {new Date(doc.createdAt).toLocaleString()} ·{' '}
+                    <a href={documentDownloadUrl(doc.publicId)}>Download</a>
+                    {doc.documentType === 'submission_agreement' && <> · ID: {doc.publicId}</>}
+                  </span>
+                </div>
+
+                {replacingDoc === doc.publicId && (
+                  <form
+                    onSubmit={(e) => handleReplaceDocument(e, doc.publicId)}
+                    className="mt-8 p-10 bg-band-alt flex flex-wrap gap-8 items-center max-w-[520px]"
+                  >
+                    <input name="file" type="file" required className="text-13" />
+                    <input
+                      name="changeReason"
+                      placeholder="Reason for the new version (optional)"
+                      className="flex-1 min-w-[180px] border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+                    />
+                    <button type="submit" className="min-h-[29px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band">
+                      Upload new version
+                    </button>
+                  </form>
+                )}
               </div>
             ))}
             {documents.length === 0 && <p className="py-14 text-13 text-muted">No documents uploaded yet.</p>}

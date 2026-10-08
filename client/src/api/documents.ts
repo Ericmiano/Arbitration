@@ -34,3 +34,19 @@ export function documentDownloadUrl(publicId: string): string {
   const base = apiClient.defaults.baseURL ?? '';
   return `${base}/documents/${publicId}`;
 }
+
+/** Replaces a document with a new version in place - the public_id and download link stay the same; the old version is archived. */
+export async function uploadDocumentVersion(
+  publicId: string,
+  file: File,
+  changeReason?: string,
+): Promise<{ publicId: string; fileName: string; version: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (changeReason) formData.append('changeReason', changeReason);
+
+  const { data } = await apiClient.post(`/documents/${publicId}/versions`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data;
+}

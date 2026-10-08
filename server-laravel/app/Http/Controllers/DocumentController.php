@@ -287,6 +287,7 @@ class DocumentController extends Controller
                     'visibility' => $d->visibility,
                     'uploadedBy' => $d->uploaded_by,
                     'scanStatus' => $d->scan_status,
+                    'version' => $d->version,
                     'createdAt' => $d->created_at,
                     'caseId' => $d->case->id,
                     'caseNumber' => $d->case->case_number,
