@@ -498,8 +498,9 @@ explicit decision rather than guessed at:
   authorized representative isn't modeled separately yet - `parties` is
   still the only participant type on a case, which understates who's
   actually acting for a party in a real matter.
-- **Frontend integration is partial.** The tribunal/panel appointment flow
-  has a real UI (`CaseDetail.tsx`'s Arbitrator tab); filings, deadlines,
-  and document versioning are backend-complete and live-tested via the API
-  but have no frontend screens yet - the same "backend first" pattern the
-  rest of this API was built with.
+- **~~Frontend integration is partial~~ - resolved.** Filings, deadlines
+  (with extension requests), and document versioning now have real UI
+  (`CaseDetail.tsx`'s Filings/Deadlines tabs and the Documents tab's
+  "Replace" action), matching the tribunal/panel appointment flow's
+  Arbitrator tab. Every backend surface built in the procedural-record
+  pass now has a frontend screen.
