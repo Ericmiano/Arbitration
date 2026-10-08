@@ -158,6 +158,11 @@ export function GlobalSearch() {
         <span className="font-mono text-9.5 tracking-[0.12em] text-muted-2">FIND</span>
         <input
           type="text"
+          role="combobox"
+          aria-expanded={open && groups.length > 0}
+          aria-controls="global-search-listbox"
+          aria-activedescendant={highlighted >= 0 ? `global-search-option-${highlighted}` : undefined}
+          aria-autocomplete="list"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -168,9 +173,14 @@ export function GlobalSearch() {
       </label>
 
       {open && groups.length > 0 && (
-        <div className="absolute top-[36px] right-0 w-[340px] max-w-[80vw] bg-sheet border border-ink shadow-lg z-10 max-h-[70vh] overflow-y-auto">
+        <div
+          id="global-search-listbox"
+          role="listbox"
+          aria-label="Search results"
+          className="absolute top-[36px] right-0 w-[340px] max-w-[80vw] bg-sheet border border-ink shadow-lg z-10 max-h-[70vh] overflow-y-auto"
+        >
           {groups.map((group) => (
-            <div key={group.type}>
+            <div key={group.type} role="group" aria-label={group.type}>
               <div className="px-14 py-6 bg-band font-mono text-9.5 tracking-[0.12em] text-muted uppercase border-b border-hairline">
                 {group.type}
               </div>
@@ -180,6 +190,9 @@ export function GlobalSearch() {
                 return (
                   <button
                     key={item.key}
+                    id={`global-search-option-${index}`}
+                    role="option"
+                    aria-selected={highlighted === index}
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => goTo(item)}

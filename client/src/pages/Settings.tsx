@@ -59,8 +59,8 @@ export function Settings() {
                 Save
               </button>
             </form>
-            {nameSaved && <p className="mt-8 text-12.5 text-green">Saved.</p>}
-            {nameError && <p className="mt-8 text-12.5 text-red">{nameError}</p>}
+            {nameSaved && <p role="status" className="mt-8 text-12.5 text-green">Saved.</p>}
+            {nameError && <p role="alert" className="mt-8 text-12.5 text-red">{nameError}</p>}
           </>
         ) : (
           <p className="mt-10 text-13 text-ink-2">
@@ -99,8 +99,8 @@ export function Settings() {
             Update password
           </button>
         </form>
-        {passwordSaved && <p className="mt-8 text-12.5 text-green">Password updated.</p>}
-        {passwordError && <p className="mt-8 text-12.5 text-red">{passwordError}</p>}
+        {passwordSaved && <p role="status" className="mt-8 text-12.5 text-green">Password updated.</p>}
+        {passwordError && <p role="alert" className="mt-8 text-12.5 text-red">{passwordError}</p>}
       </div>
 
       <div className="px-24 py-20 text-13.5 text-ink-2">

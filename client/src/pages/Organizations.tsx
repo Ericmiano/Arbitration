@@ -56,7 +56,7 @@ export function Organizations() {
               <input name="sector" className="w-full border-0 border-b border-rule bg-transparent py-6 text-13 outline-none" />
             </label>
           </div>
-          {error && <p className="mt-10 text-13 text-red">{error}</p>}
+          {error && <p role="alert" className="mt-10 text-13 text-red">{error}</p>}
           <button
             type="submit"
             className="mt-16 min-h-[31px] px-14 py-6 bg-red border-0 text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover"

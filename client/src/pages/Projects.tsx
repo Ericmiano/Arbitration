@@ -80,7 +80,7 @@ export function Projects() {
         </button>
       </div>
 
-      {error && <p className="px-24 pt-12 text-13 text-red">{error}</p>}
+      {error && <p role="alert" className="px-24 pt-12 text-13 text-red">{error}</p>}
 
       {showProjectForm && (
         <form onSubmit={handleCreateProject} className="px-24 py-20 border-b border-rule bg-band-alt max-w-[420px]">

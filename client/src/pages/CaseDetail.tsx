@@ -262,12 +262,16 @@ export function CaseDetail() {
         </div>
       </div>
 
-      <div className="flex flex-wrap border-b border-rule bg-band-alt">
+      <div role="tablist" aria-label="Case sections" className="flex flex-wrap border-b border-rule bg-band-alt">
         {TABS.map((t) => {
           const active = tab === t;
           return (
             <button
               key={t}
+              id={`case-tab-${t}`}
+              role="tab"
+              aria-selected={active}
+              aria-controls={`case-tabpanel-${t}`}
               type="button"
               onClick={() => setTab(t)}
               className={`px-16 py-10 text-12.5 border-0 cursor-pointer ${
@@ -280,10 +284,10 @@ export function CaseDetail() {
         })}
       </div>
 
-      {error && <p className="px-24 pt-14 text-13 text-red">{error}</p>}
+      {error && <p role="alert" className="px-24 pt-14 text-13 text-red">{error}</p>}
 
       {tab === 'Overview' && (
-        <div className="flex flex-wrap">
+        <div id="case-tabpanel-Overview" role="tabpanel" aria-labelledby="case-tab-Overview" tabIndex={0} className="flex flex-wrap">
           <div className="flex-[3_1_420px] min-w-0">
             <Titleblock caseRecord={caseRecord} />
             <ArbitratorBlock caseRecord={caseRecord} onOpenArbitratorTab={() => setTab('Arbitrator')} />
@@ -325,7 +329,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Parties' && (
-        <div className="px-20 py-16">
+        <div id="case-tabpanel-Parties" role="tabpanel" aria-labelledby="case-tab-Parties" tabIndex={0} className="px-20 py-16">
           {caseRecord.parties.map((p) => (
             <div key={p.id} className="py-10 border-t border-hairline first:border-t-0">
               <span className="font-mono text-9.5 tracking-[0.1em] text-muted uppercase">{p.pivot.role}</span>
@@ -336,7 +340,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Project' && (
-        <div className="px-20 py-16 text-13.5">
+        <div id="case-tabpanel-Project" role="tabpanel" aria-labelledby="case-tab-Project" tabIndex={0} className="px-20 py-16 text-13.5">
           {caseRecord.project ? (
             <>
               <div className="text-15 font-semibold">{caseRecord.project.name}</div>
@@ -350,7 +354,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Arbitrator' && (
-        <div className="px-20 py-16">
+        <div id="case-tabpanel-Arbitrator" role="tabpanel" aria-labelledby="case-tab-Arbitrator" tabIndex={0} className="px-20 py-16">
           {caseRecord.basis === 'mutual_agreement' && caseRecord.status === 'pending_agreement' && isStaff && (
             <div className="mb-20 pb-20 border-b border-rule">
               <div className="font-mono text-9.5 tracking-[0.12em] text-muted">CONFIRM SUBMISSION AGREEMENT</div>
@@ -574,7 +578,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Documents' && (
-        <div className="px-20 py-16">
+        <div id="case-tabpanel-Documents" role="tabpanel" aria-labelledby="case-tab-Documents" tabIndex={0} className="px-20 py-16">
           <form onSubmit={handleUpload} className="flex flex-wrap gap-8 items-center">
             <select name="documentType" defaultValue="evidence" className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
               <option value="contract_copy">Contract copy</option>
@@ -614,7 +618,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Hearings' && (
-        <div className="px-20 py-16">
+        <div id="case-tabpanel-Hearings" role="tabpanel" aria-labelledby="case-tab-Hearings" tabIndex={0} className="px-20 py-16">
           {isStaff && (
             <form onSubmit={handleScheduleHearing} className="pb-20 border-b border-rule flex flex-col gap-8 max-w-[460px]">
               <div className="font-mono text-9.5 tracking-[0.12em] text-muted">SCHEDULE HEARING</div>
@@ -710,7 +714,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Activity' && (
-        <div className="px-20 py-16">
+        <div id="case-tabpanel-Activity" role="tabpanel" aria-labelledby="case-tab-Activity" tabIndex={0} className="px-20 py-16">
           {displayTimeline.map((e, i) => (
             <div key={i} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-4 items-baseline">
               <span className="font-mono text-10.5 text-muted flex-[0_0_90px]">{formatMonoDate(e.date)}</span>

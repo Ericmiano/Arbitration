@@ -163,7 +163,7 @@ export function NewCase() {
             )}
           </ReviewSection>
 
-          {error && <p className="text-13 text-red">{error}</p>}
+          {error && <p role="alert" className="text-13 text-red">{error}</p>}
 
           <div className="flex gap-12">
             <button
@@ -385,7 +385,7 @@ export function NewCase() {
           )}
         </FormSection>
 
-        {error && <p className="text-13 text-red">{error}</p>}
+        {error && <p role="alert" className="text-13 text-red">{error}</p>}
 
         <div>
           <button

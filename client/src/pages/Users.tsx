@@ -75,7 +75,7 @@ export function Users() {
         </button>
       </div>
 
-      {error && <p className="px-24 pt-14 text-13 text-red">{error}</p>}
+      {error && <p role="alert" className="px-24 pt-14 text-13 text-red">{error}</p>}
 
       {isAdmin && (
         <form onSubmit={handleCreate} className="px-24 py-16 border-b border-rule bg-band-alt flex flex-wrap gap-8 items-center">

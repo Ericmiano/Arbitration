@@ -66,7 +66,7 @@ export function Hearings() {
         </div>
       </div>
 
-      {mutationError && <p className="px-24 pt-14 text-13 text-red">{mutationError}</p>}
+      {mutationError && <p role="alert" className="px-24 pt-14 text-13 text-red">{mutationError}</p>}
 
       <div className="px-24 pt-18 pb-6 font-mono text-9.5 tracking-[0.12em] text-muted">UPCOMING</div>
       {upcoming.length === 0 ? (
@@ -108,7 +108,7 @@ function HearingRow({
     <div className="px-24 py-14 border-b border-hairline flex flex-wrap gap-x-16 gap-y-6 items-baseline">
       <span className="flex-[0_0_170px] font-mono text-11.5 tracking-[0.04em]">{formatWhen(hearing.scheduled_at)}</span>
       <Link to={`/cases/${hearing.case_id}`} className="flex-[1_1_180px] min-w-0 text-13.5 font-medium">
-        {hearing.cases.case_number}
+        {hearing.case.case_number}
       </Link>
       <span className="flex-[0_0_120px] font-mono text-10 tracking-[0.09em] text-muted uppercase">
         {hearing.mode.replace('_', ' ')}

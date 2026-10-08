@@ -142,7 +142,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           >
             Sign out
           </button>
-          {signOutError && <div className="mt-6 text-11.5 text-red">{signOutError}</div>}
+          {signOutError && <div role="alert" className="mt-6 text-11.5 text-red">{signOutError}</div>}
         </div>
       </nav>
     </>

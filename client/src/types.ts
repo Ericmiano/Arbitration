@@ -78,8 +78,9 @@ export interface ArbitratorAssignment {
   id: string;
   case_id: string;
   status: string;
+  assigned_at: string;
   due_date: string;
-  cases: { id: string; case_number: string; status: string; outcome: string | null };
+  case: { id: string; case_number: string; status: string; outcome: string | null };
 }
 
 export type TribunalType = 'sole' | 'panel';
@@ -158,6 +159,8 @@ export interface Arbitrator {
   current_organization: string | null;
   aak_chapter: string | null;
   years_of_practice: number | null;
+  /** Years on the AAK arbitrator panel (since joined_at) - distinct from years_of_practice, which is general field experience. Always present (server-computed, defaults to 0). */
+  years_as_arbitrator: number;
   phone: string | null;
   bio: string | null;
   adr_experience_notes: string | null;
@@ -200,7 +203,7 @@ export interface Hearing {
   agenda: string | null;
   required_documents: string | null;
   status: 'scheduled' | 'completed' | 'cancelled' | 'postponed';
-  cases: { id: string; case_number: string };
+  case: { id: string; case_number: string };
 }
 
 export interface AuditLogEntry {

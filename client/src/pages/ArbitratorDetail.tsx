@@ -68,6 +68,9 @@ export function ArbitratorDetail() {
         <div className="mt-6 text-13.5 text-ink-2">
           {[arbitrator.current_position, arbitrator.current_organization].filter(Boolean).join(', ')}
         </div>
+        {arbitrator.years_of_practice !== null && (
+          <div className="mt-4 text-12 text-muted">{arbitrator.years_of_practice} years in general practice</div>
+        )}
         <div className="mt-10 flex items-center gap-8 font-mono text-11 tracking-[0.08em]">
           <span className={`w-7 h-7 inline-block ${arbitrator.status === 'active' ? 'bg-green' : 'bg-muted-2'}`} />
           <span className={arbitrator.status === 'active' ? 'text-green' : 'text-muted-2'}>
@@ -78,11 +81,19 @@ export function ArbitratorDetail() {
 
       <div className="flex flex-wrap border-b border-rule">
         <Stat value={arbitrator.score} label="SCORE" />
+        <Stat
+          value={`${arbitrator.years_as_arbitrator}y`}
+          label="YEARS AS ARBITRATOR"
+        />
+        <Stat value={String(arbitrator.assignments.length)} label="CASES WORKED" />
         <Stat value={String(arbitrator.cases_closed_count)} label="CASES CLOSED" />
-        <Stat value={arbitrator.years_of_practice ? `${arbitrator.years_of_practice}y` : '—'} label="PRACTICE" />
         <Stat
           value={String(arbitrator.assignments.filter((a) => ['ongoing', 'overdue', 'escalated'].includes(a.status)).length)}
           label="ACTIVE CASES"
+        />
+        <Stat
+          value={arbitrator.assignments[0] ? new Date(arbitrator.assignments[0].assigned_at).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+          label="LAST ASSIGNED"
         />
       </div>
 
@@ -150,7 +161,7 @@ export function ArbitratorDetail() {
                 required
                 className="mt-8 w-full border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
               />
-              {error && <p className="mt-8 text-12.5 text-red">{error}</p>}
+              {error && <p role="alert" className="mt-8 text-12.5 text-red">{error}</p>}
               <button
                 type="submit"
                 className="mt-10 min-h-[28px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band"
@@ -222,7 +233,7 @@ export function ArbitratorDetail() {
           <div className="mt-8">
             {arbitrator.assignments.map((a) => (
               <div key={a.id} className="py-8 border-t border-hairline flex flex-wrap gap-x-16 gap-y-4 items-baseline">
-                <span className="font-mono text-12 flex-[0_0_140px]">{a.cases.case_number}</span>
+                <span className="font-mono text-12 flex-[0_0_140px]">{a.case.case_number}</span>
                 <span className="font-mono text-10.5 text-muted flex-[0_0_100px] uppercase">{a.status}</span>
                 <span className="font-mono text-10.5 text-muted-2">
                   due {new Date(a.due_date).toLocaleDateString()}
