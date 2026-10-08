@@ -482,12 +482,16 @@ explicit decision rather than guessed at:
   produced some near-duplicate party spellings (data-entry variance in the
   source spreadsheet, e.g. minor punctuation differences on the same
   company). Nothing merges these automatically - flagged, not silently fixed.
-- **No formal nomination/accept-decline step.** `tribunal_members.status`
-  models the full real-world lifecycle (`nominated` → `appointed` →
-  `accepted`, or `challenged`/`recused`), but today's appointment flow
-  goes straight to `appointed` with `accepted_at` set immediately - there's
-  no arbitrator-facing "here's a nomination, accept or decline" screen
-  yet. The schema doesn't need to change to add one later.
+- **~~No formal nomination/accept-decline step~~ - resolved.** A new
+  appointment now starts life as `nominated` (no `accepted_at`, no
+  `assignments` row, doesn't count toward workload) and only becomes
+  `accepted` - creating the assignment and, once every seat is accepted,
+  constituting the tribunal - when the nominated arbitrator (or staff,
+  acting on their behalf) explicitly accepts via `POST
+  /tribunals/{id}/members/{id}/accept`, with a matching `decline` endpoint
+  that reopens the seat. The arbitrator is notified via the existing
+  `notifications` system. `CaseDetail.tsx`'s Arbitrator tab shows
+  "awaiting response" plus Accept/Decline for a pending nomination.
 - **No procedural-order or exhibit-numbering objects.** `case_events` can
   represent "Procedural Order No. 1 issued" as an event, but there's no
   first-class `procedural_orders` table with its own order numbering, and

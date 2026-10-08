@@ -215,56 +215,79 @@ class TribunalController extends Controller
             ->first();
 
         $case = $tribunal->case;
-        // Captured before the transaction: a mid-case seat replacement
-        // re-constitutes the tribunal without the case ever having left
-        // 'ongoing' - only a true first constitution (case still
-        // pending_assignment) is a real status transition worth recording
-        // as one. Getting this wrong would log a false transition on every
-        // replacement and silently push the case's due date forward each time.
-        $wasFirstConstitution = $case->status === 'pending_assignment';
 
-        $member = DB::transaction(function () use ($tribunal, $arbitrator, $role, $case, $vacatedMember, $wasFirstConstitution) {
-            $created = TribunalMember::create([
+        $member = DB::transaction(function () use ($tribunal, $arbitrator, $role, $vacatedMember) {
+            return TribunalMember::create([
                 'tribunal_id' => $tribunal->id,
                 'arbitrator_id' => $arbitrator->id,
                 'role' => $role,
                 'appointed_by' => Auth::id(),
                 'replaced_member_id' => $vacatedMember?->id,
-                // No separate accept/decline step today - appointment is
-                // treated as immediately accepted, matching the existing
-                // single-arbitrator assignment flow's UX. A real
-                // accept/decline portal step is future work.
-                'accepted_at' => now(),
-                'status' => 'appointed',
+                // Awaiting the arbitrator's own accept/decline (see accept()
+                // / decline() below) - nothing is assigned or counted toward
+                // their workload until they confirm.
+                'status' => 'nominated',
             ]);
+        });
+
+        AuditService::log(Auth::id(), 'tribunal_member_nominated', 'tribunal_member', $member->id, ['arbitratorId' => $arbitrator->id, 'role' => $role], $request->ip());
+        CaseTimelineService::log(
+            (int) $tribunal->case_id, 'arbitrator_nominated', Auth::id(),
+            "{$arbitrator->full_name} nominated as ".str_replace('_', ' ', $role).' - awaiting acceptance',
+            referenceType: 'tribunal_member', referenceId: (int) $member->id,
+        );
+
+        \App\Services\NotifyService::notifyUsers(
+            [$arbitrator->user_id], 'tribunal_nomination', 'tribunal_member', (int) $member->id,
+            "You've been nominated as {$role} for case {$case->case_number}. Please accept or decline.",
+        );
+
+        return response()->json($member->load('arbitrator:id,full_name'), 201);
+    }
+
+    /**
+     * The nominated arbitrator (or staff, acting on their behalf) confirms
+     * the appointment. This is the moment the seat actually starts counting
+     * toward their workload/scoring - creating the Assignment row - and the
+     * moment that can complete the tribunal's constitution.
+     */
+    public function acceptMember(Request $request, string $tribunalId, string $memberId): JsonResponse
+    {
+        [$tribunal, $member, $errorResponse] = $this->findPendingNomination($tribunalId, $memberId);
+        if ($errorResponse) {
+            return $errorResponse;
+        }
+
+        $case = $tribunal->case;
+        // Captured before the transaction, same reasoning as the old
+        // addMember() constitution check: only a true first constitution
+        // (case still pending_assignment) is a real status transition worth
+        // recording - a mid-case seat replacement re-constitutes without the
+        // case ever leaving 'ongoing'.
+        $wasFirstConstitution = $case->status === 'pending_assignment';
+
+        $justConstituted = DB::transaction(function () use ($tribunal, $member, $case, $wasFirstConstitution) {
+            $member->update(['status' => 'accepted', 'accepted_at' => now()]);
 
             \App\Models\Assignment::create([
                 'case_id' => $case->id,
-                'arbitrator_id' => $arbitrator->id,
+                'arbitrator_id' => $member->arbitrator_id,
                 'assigned_by' => Auth::id(),
                 'due_date' => SlaService::computeDueDate($case->sla_tier, $case->currency),
                 'status' => 'ongoing',
             ]);
 
-            $remainingSeats = $this->openSeats($tribunal->fresh());
-            if (empty($remainingSeats)) {
-                $tribunal->update(['status' => 'constituted', 'constituted_at' => now()]);
-                if ($wasFirstConstitution) {
-                    $case->update(['status' => 'ongoing', 'due_date' => SlaService::computeDueDate($case->sla_tier, $case->currency)]);
-                }
-            }
-
-            return $created;
+            return $this->tryConstitute($tribunal, $case, $wasFirstConstitution);
         });
 
-        AuditService::log(Auth::id(), 'tribunal_member_appointed', 'tribunal_member', $member->id, ['arbitratorId' => $arbitrator->id, 'role' => $role], $request->ip());
+        AuditService::log(Auth::id(), 'tribunal_member_accepted', 'tribunal_member', $member->id, null, $request->ip());
         CaseTimelineService::log(
-            (int) $tribunal->case_id, 'arbitrator_appointed', Auth::id(),
-            "{$arbitrator->full_name} appointed as ".str_replace('_', ' ', $role),
+            (int) $tribunal->case_id, 'arbitrator_accepted', Auth::id(),
+            "{$member->arbitrator->full_name} accepted appointment as ".str_replace('_', ' ', $member->role),
             referenceType: 'tribunal_member', referenceId: (int) $member->id,
         );
 
-        if ($tribunal->fresh()->status === 'constituted') {
+        if ($justConstituted) {
             if ($wasFirstConstitution) {
                 CaseTimelineService::statusChanged(
                     (int) $tribunal->case_id, 'pending_assignment', 'ongoing', Auth::id(),
@@ -275,7 +298,86 @@ class TribunalController extends Controller
             }
         }
 
-        return response()->json($member->load('arbitrator:id,full_name'), 201);
+        return response()->json($member->fresh()->load('arbitrator:id,full_name'));
+    }
+
+    /** The nominated arbitrator (or staff) declines - the seat reopens for a new nomination. */
+    public function declineMember(Request $request, string $tribunalId, string $memberId): JsonResponse
+    {
+        try {
+            $data = $request->validate(['reason' => ['required', 'string', 'max:500']]);
+        } catch (ValidationException) {
+            return response()->json(['error' => 'reason is required'], 400);
+        }
+
+        [$tribunal, $member, $errorResponse] = $this->findPendingNomination($tribunalId, $memberId);
+        if ($errorResponse) {
+            return $errorResponse;
+        }
+
+        $member->update(['status' => 'withdrawn', 'notes' => "Declined nomination: {$data['reason']}"]);
+
+        AuditService::log(Auth::id(), 'tribunal_member_declined', 'tribunal_member', $member->id, ['reason' => $data['reason']], $request->ip());
+        CaseTimelineService::log(
+            (int) $tribunal->case_id, 'arbitrator_declined', Auth::id(),
+            "{$member->arbitrator->full_name} declined nomination as ".str_replace('_', ' ', $member->role),
+            $data['reason'], referenceType: 'tribunal_member', referenceId: (int) $member->id,
+        );
+
+        return response()->json(['message' => 'Nomination declined']);
+    }
+
+    /**
+     * Shared lookup + auth for accept/decline: the nomination must still be
+     * pending, and the caller must be either staff or the nominated
+     * arbitrator themselves - never a different arbitrator or an unrelated party.
+     */
+    private function findPendingNomination(string $tribunalId, string $memberId): array
+    {
+        $tId = Ids::parse($tribunalId);
+        $mId = Ids::parse($memberId);
+        if ($tId === null || $mId === null) {
+            return [null, null, response()->json(['error' => 'Invalid tribunal or member id'], 400)];
+        }
+
+        $tribunal = CaseTribunal::with('case')->find($tId);
+        $member = TribunalMember::with('arbitrator')->where('tribunal_id', $tId)->find($mId);
+        if (! $tribunal || ! $member || $member->status !== 'nominated') {
+            return [null, null, response()->json(['error' => 'No pending nomination found'], 404)];
+        }
+
+        $user = Auth::user();
+        $isNominee = $user->role === 'arbitrator' && (int) $member->arbitrator->user_id === (int) $user->id;
+        if (! $this->isStaff() && ! $isNominee) {
+            return [null, null, response()->json(['error' => 'Forbidden'], 403)];
+        }
+
+        return [$tribunal, $member, null];
+    }
+
+    /** True once every seat is filled and every active member has actually accepted - not merely been nominated. */
+    private function tryConstitute(CaseTribunal $tribunal, ArbitrationCase $case, bool $wasFirstConstitution): bool
+    {
+        if (! empty($this->openSeats($tribunal->fresh()))) {
+            return false;
+        }
+
+        $activeMembers = $tribunal->activeMembers()->get();
+        // 'appointed' is kept as equivalent here only for data predating this
+        // accept/decline flow, where appointment was recorded as immediately
+        // final - no nomination created after this point ever reaches it.
+        $allAccepted = $activeMembers->isNotEmpty()
+            && $activeMembers->every(fn ($m) => in_array($m->status, ['accepted', 'appointed'], true));
+        if (! $allAccepted) {
+            return false;
+        }
+
+        $tribunal->update(['status' => 'constituted', 'constituted_at' => now()]);
+        if ($wasFirstConstitution) {
+            $case->update(['status' => 'ongoing', 'due_date' => SlaService::computeDueDate($case->sla_tier, $case->currency)]);
+        }
+
+        return true;
     }
 
     public function withdrawMember(Request $request, string $tribunalId, string $memberId): JsonResponse

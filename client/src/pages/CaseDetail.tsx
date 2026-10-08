@@ -18,7 +18,7 @@ import {
 } from '../api/deadlines';
 import { documentDownloadUrl, listDocuments, uploadDocument, uploadDocumentVersion } from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
-import { appointMember, concludeCase, createTribunal, withdrawMember } from '../api/tribunals';
+import { acceptMember, appointMember, concludeCase, createTribunal, declineMember, withdrawMember } from '../api/tribunals';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -185,6 +185,17 @@ export function CaseDetail() {
     const reason = window.prompt('Reason for this arbitrator leaving the tribunal?');
     if (!reason) return;
     await withAsyncAction(() => withdrawMember(tribunal!.id, memberId, reason, 'withdrawn'));
+  }
+
+  async function handleAcceptNomination(memberId: string) {
+    if (!tribunal) return;
+    await withAsyncAction(() => acceptMember(tribunal.id, memberId));
+  }
+
+  async function handleDeclineNomination(memberId: string) {
+    const reason = window.prompt('Reason for declining this nomination?');
+    if (!reason) return;
+    await withAsyncAction(() => declineMember(tribunal!.id, memberId, reason));
   }
 
   async function handleRequestExtension(event: FormEvent<HTMLFormElement>) {
@@ -440,6 +451,9 @@ export function CaseDetail() {
               <div className="mt-8">
                 {tribunal.members.map((m) => {
                   const isMemberActive = ['nominated', 'appointed', 'accepted'].includes(m.status);
+                  const isPending = m.status === 'nominated';
+                  const isNominee = user?.role === 'arbitrator' && String(m.arbitrator.user_id) === String(user.id);
+                  const canRespond = isPending && (isStaff || isNominee);
                   return (
                     <div key={m.id} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap items-baseline gap-x-16 gap-y-4">
                       <Link to={`/arbitrators/${m.arbitrator_id}`} className="flex-[1_1_200px] text-14 font-semibold text-ink hover:text-red">
@@ -448,12 +462,36 @@ export function CaseDetail() {
                       <span className="font-mono text-10.5 text-muted uppercase">{m.role.replace(/_/g, ' ')}</span>
                       <span
                         className={`font-mono text-10.5 uppercase ${
-                          isMemberActive ? 'text-green' : ['withdrawn', 'removed', 'recused'].includes(m.status) ? 'text-muted-2' : 'text-amber'
+                          isPending
+                            ? 'text-amber'
+                            : isMemberActive
+                              ? 'text-green'
+                              : ['withdrawn', 'removed', 'recused'].includes(m.status)
+                                ? 'text-muted-2'
+                                : 'text-amber'
                         }`}
                       >
-                        {m.status}
+                        {isPending ? 'awaiting response' : m.status}
                       </span>
-                      {isStaff && isMemberActive && tribunal.status !== 'dissolved' && (
+                      {canRespond && (
+                        <span className="ml-auto flex gap-8">
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptNomination(m.id)}
+                            className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeclineNomination(m.id)}
+                            className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                          >
+                            Decline
+                          </button>
+                        </span>
+                      )}
+                      {isStaff && isMemberActive && !isPending && tribunal.status !== 'dissolved' && (
                         <button
                           type="button"
                           onClick={() => handleWithdrawMember(m.id)}

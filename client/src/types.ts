@@ -104,7 +104,7 @@ export interface TribunalMember {
   status: TribunalMemberStatus;
   notes: string | null;
   replaced_member_id: string | null;
-  arbitrator: { id: string; full_name: string };
+  arbitrator: { id: string; full_name: string; user_id: string };
 }
 
 export interface Tribunal {

@@ -31,7 +31,7 @@ class CaseController extends Controller
             'assignments' => fn ($q) => $q->whereIn('status', ['ongoing', 'completed'])
                 ->with('arbitrator:id,full_name')
                 ->orderByDesc('assigned_at'),
-            'activeTribunal.members' => fn ($q) => $q->with('arbitrator:id,full_name'),
+            'activeTribunal.members' => fn ($q) => $q->with('arbitrator:id,full_name,user_id'),
         ]);
     }
 

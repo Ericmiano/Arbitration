@@ -61,6 +61,8 @@ Route::middleware('auth.session')->group(function () {
     Route::post('/cases/{caseId}/tribunal', [TribunalController::class, 'store']);
     Route::get('/cases/{caseId}/tribunal', [TribunalController::class, 'show']);
     Route::post('/tribunals/{tribunalId}/members', [TribunalController::class, 'addMember']);
+    Route::post('/tribunals/{tribunalId}/members/{memberId}/accept', [TribunalController::class, 'acceptMember']);
+    Route::post('/tribunals/{tribunalId}/members/{memberId}/decline', [TribunalController::class, 'declineMember']);
     Route::post('/tribunals/{tribunalId}/members/{memberId}/withdraw', [TribunalController::class, 'withdrawMember'])->middleware('role:admin,registrar,staff');
     Route::post('/cases/{caseId}/conclude', [TribunalController::class, 'conclude']);
 

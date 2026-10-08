@@ -20,6 +20,15 @@ export async function appointMember(
   return data;
 }
 
+export async function acceptMember(tribunalId: string, memberId: string): Promise<TribunalMember> {
+  const { data } = await apiClient.post(`/tribunals/${tribunalId}/members/${memberId}/accept`);
+  return data;
+}
+
+export async function declineMember(tribunalId: string, memberId: string, reason: string): Promise<void> {
+  await apiClient.post(`/tribunals/${tribunalId}/members/${memberId}/decline`, { reason });
+}
+
 export async function withdrawMember(
   tribunalId: string,
   memberId: string,
