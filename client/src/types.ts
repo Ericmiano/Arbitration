@@ -70,7 +70,7 @@ export interface AssignmentSummary {
   arbitrator_id: string;
   status: string;
   due_date: string;
-  arbitrators: { id: string; full_name: string };
+  arbitrator: { id: string; full_name: string };
 }
 
 /** Shape returned by GET /arbitrators/:id - assignments joined to their case, not the arbitrator. */
@@ -124,6 +124,49 @@ export interface CaseEvent {
   title: string;
   description: string | null;
   actor: { id: string; full_name: string; email: string } | null;
+}
+
+export type FilingStatus = 'submitted' | 'accepted' | 'rejected';
+
+export interface Filing {
+  id: string;
+  case_id: string;
+  party_id: string | null;
+  filing_type: string;
+  title: string;
+  description: string | null;
+  submitted_at: string;
+  status: FilingStatus;
+  accepted_at: string | null;
+  rejected_at: string | null;
+  rejection_reason: string | null;
+  party: { id: string; full_name: string } | null;
+  documents: Array<{ id: string; public_id: string; file_name: string; document_type: string }>;
+}
+
+export type DeadlineStatus = 'pending' | 'completed' | 'waived' | 'extended' | 'cancelled';
+
+export interface DeadlineExtensionRequest {
+  id: string;
+  deadline_id: string;
+  original_due_at: string;
+  requested_due_at: string;
+  reason: string;
+  decision: 'pending' | 'approved' | 'rejected';
+}
+
+export interface Deadline {
+  id: string;
+  case_id: string;
+  tribunal_member_id: string | null;
+  party_id: string | null;
+  deadline_type: string;
+  title: string;
+  description: string | null;
+  due_at: string;
+  status: DeadlineStatus;
+  completed_at: string | null;
+  extensions: DeadlineExtensionRequest[];
 }
 
 export interface Case {

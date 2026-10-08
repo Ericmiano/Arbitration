@@ -32,7 +32,10 @@ class DeadlineController extends Controller
             return response()->json(['error' => 'Case not found'], 404);
         }
 
-        $deadlines = Deadline::where('case_id', $id)->orderBy('due_at')->get();
+        $deadlines = Deadline::where('case_id', $id)
+            ->with(['extensions' => fn ($q) => $q->orderByDesc('requested_at')])
+            ->orderBy('due_at')
+            ->get();
 
         return response()->json($deadlines);
     }

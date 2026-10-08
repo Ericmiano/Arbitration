@@ -3,6 +3,19 @@ import { Link, useParams } from 'react-router-dom';
 import { listEligibleArbitrators } from '../api/arbitrators';
 import { AssignmentExtension, decideExtension, listExtensions, requestExtension } from '../api/assignments';
 import { confirmAgreement, getCase, getCaseTimeline } from '../api/cases';
+import {
+  attachFilingDocument,
+  createFiling,
+  decideFiling,
+  listFilings,
+} from '../api/filings';
+import {
+  createDeadline,
+  decideDeadlineExtension,
+  listDeadlines,
+  requestDeadlineExtension,
+  updateDeadlineStatus,
+} from '../api/deadlines';
 import { documentDownloadUrl, listDocuments, uploadDocument } from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
 import { appointMember, concludeCase, createTribunal, withdrawMember } from '../api/tribunals';
@@ -22,7 +35,7 @@ import {
   isTerminalGroup,
   statusTone,
 } from '../lib/caseDisplay';
-import { Arbitrator, Case, CaseEvent, DocumentSummary, Hearing, TribunalMemberRole } from '../types';
+import { Arbitrator, Case, CaseEvent, Deadline, DocumentSummary, Filing, Hearing, TribunalMemberRole } from '../types';
 
 const PANEL_OPEN_SEATS: Record<'sole' | 'panel', TribunalMemberRole[]> = {
   sole: ['sole_arbitrator'],
@@ -38,7 +51,7 @@ function remainingSeats(tribunalType: 'sole' | 'panel', members: { role: Tribuna
   return remaining;
 }
 
-const TABS = ['Overview', 'Parties', 'Project', 'Arbitrator', 'Documents', 'Hearings', 'Activity'] as const;
+const TABS = ['Overview', 'Parties', 'Project', 'Arbitrator', 'Documents', 'Filings', 'Deadlines', 'Hearings', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
 
 export function CaseDetail() {
@@ -52,6 +65,8 @@ export function CaseDetail() {
   const [eligible, setEligible] = useState<Arbitrator[]>([]);
   const [extensions, setExtensions] = useState<AssignmentExtension[]>([]);
   const [timeline, setTimeline] = useState<CaseEvent[]>([]);
+  const [filings, setFilings] = useState<Filing[]>([]);
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('Overview');
 
@@ -69,6 +84,8 @@ export function CaseDetail() {
     listDocuments(caseId).then(setDocuments);
     listHearings(caseId).then(setHearings);
     getCaseTimeline(caseId).then(setTimeline);
+    listFilings(caseId).then(setFilings);
+    listDeadlines(caseId).then(setDeadlines);
   }
 
   useEffect(reload, [caseId]);
@@ -503,7 +520,7 @@ export function CaseDetail() {
             <div className="mt-20">
               <div className="flex flex-wrap gap-x-18 gap-y-8 items-baseline">
                 <Link to={`/arbitrators/${assignment.arbitrator_id}`} className="text-16 font-semibold text-ink hover:text-red">
-                  {assignment.arbitrators.full_name}
+                  {assignment.arbitrator.full_name}
                 </Link>
                 <span className="font-mono text-10.5 text-muted uppercase">{assignment.status}</span>
                 <span className="font-mono text-10.5 text-muted-2">due {formatMonoDate(assignment.due_date)}</span>
@@ -614,6 +631,32 @@ export function CaseDetail() {
             ))}
             {documents.length === 0 && <p className="py-14 text-13 text-muted">No documents uploaded yet.</p>}
           </div>
+        </div>
+      )}
+
+      {tab === 'Filings' && (
+        <div id="case-tabpanel-Filings" role="tabpanel" aria-labelledby="case-tab-Filings" tabIndex={0} className="px-20 py-16">
+          <FilingsTab
+            caseId={caseId!}
+            filings={filings}
+            documents={documents}
+            parties={caseRecord.parties}
+            isStaff={isStaff}
+            onAction={withAsyncAction}
+          />
+        </div>
+      )}
+
+      {tab === 'Deadlines' && (
+        <div id="case-tabpanel-Deadlines" role="tabpanel" aria-labelledby="case-tab-Deadlines" tabIndex={0} className="px-20 py-16">
+          <DeadlinesTab
+            caseId={caseId!}
+            deadlines={deadlines}
+            parties={caseRecord.parties}
+            tribunalMembers={tribunal?.members ?? []}
+            isStaff={isStaff}
+            onAction={withAsyncAction}
+          />
         </div>
       )}
 
@@ -773,7 +816,7 @@ function ArbitratorBlock({ caseRecord, onOpenArbitratorTab }: { caseRecord: Case
       {assignment ? (
         <>
           <div className="mt-10 flex flex-wrap gap-x-18 gap-y-8 items-baseline">
-            <span className="text-16 font-semibold">{assignment.arbitrators.full_name}</span>
+            <span className="text-16 font-semibold">{assignment.arbitrator.full_name}</span>
             <button
               type="button"
               onClick={onOpenArbitratorTab}
@@ -827,6 +870,428 @@ function CaseFilePreview({ documents, onViewAll }: { documents: DocumentSummary[
           </div>
         ))}
         {preview.length === 0 && <p className="py-11 text-13 text-muted">No documents uploaded yet.</p>}
+      </div>
+    </div>
+  );
+}
+
+const FILING_TYPES = [
+  'statement_of_claim',
+  'statement_of_defence',
+  'reply',
+  'witness_statement',
+  'expert_report',
+  'submission',
+  'application',
+  'other',
+];
+
+function FilingsTab({
+  caseId,
+  filings,
+  documents,
+  parties,
+  isStaff,
+  onAction,
+}: {
+  caseId: string;
+  filings: Filing[];
+  documents: DocumentSummary[];
+  parties: Case['parties'];
+  isStaff: boolean;
+  onAction: (action: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [attachingTo, setAttachingTo] = useState<string | null>(null);
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const partyId = form.get('partyId');
+    await onAction(async () => {
+      await createFiling(caseId, {
+        filingType: String(form.get('filingType')),
+        title: String(form.get('title')),
+        description: String(form.get('description') || '') || undefined,
+        partyId: partyId ? Number(partyId) : undefined,
+        documentPublicIds: selectedDocs.length > 0 ? selectedDocs : undefined,
+      });
+      setShowForm(false);
+      setSelectedDocs([]);
+    });
+  }
+
+  function toggleDoc(publicId: string) {
+    setSelectedDocs((prev) => (prev.includes(publicId) ? prev.filter((id) => id !== publicId) : [...prev, publicId]));
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-14">
+        <span className="font-mono text-9.5 tracking-[0.12em] text-muted">FILINGS</span>
+        <button
+          type="button"
+          onClick={() => setShowForm((v) => !v)}
+          className="ml-auto bg-transparent border-0 border-b border-ink py-2 text-12 cursor-pointer hover:text-red hover:border-red"
+        >
+          {showForm ? 'Cancel' : 'New filing'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="mt-14 pb-16 border-b border-rule flex flex-col gap-8 max-w-[520px]">
+          <div className="flex flex-wrap gap-8">
+            <select name="filingType" required defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+              <option value="" disabled>
+                Filing type
+              </option>
+              {FILING_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+            <select name="partyId" defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+              <option value="">Submitted on behalf of (optional)</option>
+              {parties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name} ({p.pivot.role})
+                </option>
+              ))}
+            </select>
+          </div>
+          <input
+            name="title"
+            required
+            placeholder="Title (e.g. Respondent's Statement of Defence)"
+            className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none"
+          />
+          <textarea
+            name="description"
+            rows={2}
+            placeholder="Description (optional)"
+            className="border border-rule bg-sheet p-8 text-13 outline-none"
+          />
+          {documents.length > 0 && (
+            <div>
+              <div className="font-mono text-9.5 tracking-[0.1em] text-muted mb-4">ATTACH EXISTING DOCUMENTS</div>
+              <div className="flex flex-col gap-4">
+                {documents.map((d) => (
+                  <label key={d.publicId} className="flex items-center gap-7 text-12.5">
+                    <input type="checkbox" checked={selectedDocs.includes(d.publicId)} onChange={() => toggleDoc(d.publicId)} />
+                    {d.fileName}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          <button
+            type="submit"
+            className="self-start min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band"
+          >
+            Submit filing
+          </button>
+        </form>
+      )}
+
+      <div className="mt-14">
+        {filings.map((f) => (
+          <div key={f.id} className="py-12 border-t border-hairline">
+            <div className="flex flex-wrap gap-x-14 gap-y-4 items-baseline">
+              <span className="text-13.5 font-medium">{f.title}</span>
+              <span className="font-mono text-10 tracking-[0.09em] text-muted uppercase">{f.filing_type.replace(/_/g, ' ')}</span>
+              <span
+                className={`font-mono text-10 tracking-[0.08em] uppercase ${
+                  f.status === 'accepted' ? 'text-green' : f.status === 'rejected' ? 'text-red' : 'text-amber'
+                }`}
+              >
+                {f.status}
+              </span>
+              <span className="ml-auto flex gap-8">
+                {isStaff && f.status === 'submitted' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onAction(() => decideFiling(f.id, 'accepted'))}
+                      className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                    >
+                      Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const reason = window.prompt('Reason for rejecting this filing?');
+                        if (reason) onAction(() => decideFiling(f.id, 'rejected', reason));
+                      }}
+                      className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAttachingTo(attachingTo === f.id ? null : f.id)}
+                  className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                >
+                  + Exhibit
+                </button>
+              </span>
+            </div>
+            <div className="mt-4 text-12 text-muted">
+              {f.party ? `${f.party.full_name} · ` : ''}
+              {new Date(f.submitted_at).toLocaleDateString()}
+              {f.description && ` · ${f.description}`}
+            </div>
+            {f.documents.length > 0 && (
+              <div className="mt-6 flex flex-wrap gap-x-12 gap-y-2 font-mono text-10.5 text-muted-2">
+                {f.documents.map((d) => (
+                  <span key={d.public_id}>{d.file_name}</span>
+                ))}
+              </div>
+            )}
+            {f.status === 'rejected' && f.rejection_reason && (
+              <div className="mt-4 text-12 text-red">Rejected: {f.rejection_reason}</div>
+            )}
+
+            {attachingTo === f.id && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = new FormData(e.currentTarget);
+                  const publicId = String(form.get('documentPublicId'));
+                  onAction(() => attachFilingDocument(f.id, publicId)).then(() => setAttachingTo(null));
+                }}
+                className="mt-8 p-10 bg-band-alt flex flex-wrap gap-8 items-center max-w-[460px]"
+              >
+                <select name="documentPublicId" required defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+                  <option value="" disabled>
+                    Select a document already on file
+                  </option>
+                  {documents.map((d) => (
+                    <option key={d.publicId} value={d.publicId}>
+                      {d.fileName}
+                    </option>
+                  ))}
+                </select>
+                <button type="submit" className="min-h-[29px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band">
+                  Attach
+                </button>
+              </form>
+            )}
+          </div>
+        ))}
+        {filings.length === 0 && <p className="py-14 text-13 text-muted">No filings submitted yet.</p>}
+      </div>
+    </div>
+  );
+}
+
+const DEADLINE_TYPES = ['filing_due', 'evidence_due', 'response_due', 'award_due', 'hearing_prep', 'other'];
+
+function DeadlinesTab({
+  caseId,
+  deadlines,
+  parties,
+  tribunalMembers,
+  isStaff,
+  onAction,
+}: {
+  caseId: string;
+  deadlines: Deadline[];
+  parties: Case['parties'];
+  tribunalMembers: Array<{ id: string; arbitrator: { full_name: string } }>;
+  isStaff: boolean;
+  onAction: (action: () => Promise<unknown>) => Promise<void>;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [extendingId, setExtendingId] = useState<string | null>(null);
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const partyId = form.get('partyId');
+    const tribunalMemberId = form.get('tribunalMemberId');
+    await onAction(async () => {
+      await createDeadline(caseId, {
+        deadlineType: String(form.get('deadlineType')),
+        title: String(form.get('title')),
+        description: String(form.get('description') || '') || undefined,
+        dueAt: String(form.get('dueAt')),
+        partyId: partyId ? Number(partyId) : undefined,
+        tribunalMemberId: tribunalMemberId ? Number(tribunalMemberId) : undefined,
+      });
+      setShowForm(false);
+    });
+  }
+
+  async function handleRequestExtension(event: FormEvent<HTMLFormElement>, deadlineId: string) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await onAction(async () => {
+      await requestDeadlineExtension(deadlineId, String(form.get('reason')), String(form.get('requestedDueAt')));
+      setExtendingId(null);
+    });
+  }
+
+  return (
+    <div>
+      <div className="flex items-baseline gap-14">
+        <span className="font-mono text-9.5 tracking-[0.12em] text-muted">DEADLINES</span>
+        {isStaff && (
+          <button
+            type="button"
+            onClick={() => setShowForm((v) => !v)}
+            className="ml-auto bg-transparent border-0 border-b border-ink py-2 text-12 cursor-pointer hover:text-red hover:border-red"
+          >
+            {showForm ? 'Cancel' : 'New deadline'}
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="mt-14 pb-16 border-b border-rule flex flex-col gap-8 max-w-[520px]">
+          <div className="flex flex-wrap gap-8">
+            <select name="deadlineType" required defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+              <option value="" disabled>
+                Deadline type
+              </option>
+              {DEADLINE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </select>
+            <input name="dueAt" type="datetime-local" required className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+          </div>
+          <input name="title" required placeholder="Title" className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+          <div className="flex flex-wrap gap-8">
+            <select name="partyId" defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+              <option value="">Party (optional)</option>
+              {parties.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name} ({p.pivot.role})
+                </option>
+              ))}
+            </select>
+            {tribunalMembers.length > 0 && (
+              <select name="tribunalMemberId" defaultValue="" className="flex-1 border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
+                <option value="">Tribunal member (optional)</option>
+                {tribunalMembers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.arbitrator.full_name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <textarea name="description" rows={2} placeholder="Description (optional)" className="border border-rule bg-sheet p-8 text-13 outline-none" />
+          <button type="submit" className="self-start min-h-[31px] px-14 border border-ink bg-transparent text-12.5 cursor-pointer hover:bg-band">
+            Set deadline
+          </button>
+        </form>
+      )}
+
+      <div className="mt-14">
+        {deadlines.map((d) => (
+          <div key={d.id} className="py-12 border-t border-hairline">
+            <div className="flex flex-wrap gap-x-14 gap-y-4 items-baseline">
+              <span className="text-13.5 font-medium">{d.title}</span>
+              <span className="font-mono text-10 tracking-[0.09em] text-muted uppercase">{d.deadline_type.replace(/_/g, ' ')}</span>
+              <span className="font-mono text-10.5 text-muted-2">due {new Date(d.due_at).toLocaleString()}</span>
+              <span
+                className={`font-mono text-10 tracking-[0.08em] uppercase ${
+                  d.status === 'completed'
+                    ? 'text-green'
+                    : d.status === 'cancelled' || d.status === 'waived'
+                      ? 'text-muted-2'
+                      : 'text-amber'
+                }`}
+              >
+                {d.status}
+              </span>
+              {d.status === 'pending' && (
+                <span className="ml-auto flex gap-8">
+                  <button
+                    type="button"
+                    onClick={() => onAction(() => updateDeadlineStatus(d.id, 'completed'))}
+                    className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                  >
+                    Mark completed
+                  </button>
+                  {isStaff && (
+                    <button
+                      type="button"
+                      onClick={() => onAction(() => updateDeadlineStatus(d.id, 'waived'))}
+                      className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                    >
+                      Waive
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setExtendingId(extendingId === d.id ? null : d.id)}
+                    className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                  >
+                    Request extension
+                  </button>
+                </span>
+              )}
+            </div>
+            {d.description && <div className="mt-4 text-12 text-muted">{d.description}</div>}
+
+            {d.extensions
+              .filter((ext) => ext.decision === 'pending')
+              .map((ext) => (
+                <div key={ext.id} className="mt-8 p-10 bg-band-alt flex flex-wrap gap-x-14 gap-y-6 items-baseline max-w-[520px]">
+                  <span className="text-12.5">
+                    Extension requested: {new Date(ext.original_due_at).toLocaleDateString()} →{' '}
+                    {new Date(ext.requested_due_at).toLocaleDateString()}
+                  </span>
+                  <span className="text-12 text-muted">{ext.reason}</span>
+                  {isStaff && (
+                    <span className="ml-auto flex gap-8">
+                      <button
+                        type="button"
+                        onClick={() => onAction(() => decideDeadlineExtension(d.id, ext.id, 'approved'))}
+                        className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onAction(() => decideDeadlineExtension(d.id, ext.id, 'rejected'))}
+                        className="min-h-[26px] px-10 border border-ink bg-transparent text-11.5 cursor-pointer hover:bg-band"
+                      >
+                        Reject
+                      </button>
+                    </span>
+                  )}
+                </div>
+              ))}
+
+            {extendingId === d.id && (
+              <form
+                onSubmit={(e) => handleRequestExtension(e, d.id)}
+                className="mt-8 p-10 bg-band-alt flex flex-wrap gap-8 items-end max-w-[460px]"
+              >
+                <label className="flex-1 flex flex-col gap-4">
+                  <span className="font-mono text-9.5 text-muted">NEW DUE DATE</span>
+                  <input name="requestedDueAt" type="datetime-local" required className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+                </label>
+                <label className="flex-1 flex flex-col gap-4">
+                  <span className="font-mono text-9.5 text-muted">REASON</span>
+                  <input name="reason" required className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none" />
+                </label>
+                <button type="submit" className="min-h-[29px] px-12 border border-ink bg-transparent text-12 cursor-pointer hover:bg-band">
+                  Request
+                </button>
+              </form>
+            )}
+          </div>
+        ))}
+        {deadlines.length === 0 && <p className="py-14 text-13 text-muted">No deadlines recorded yet.</p>}
       </div>
     </div>
   );

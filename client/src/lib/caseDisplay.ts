@@ -136,7 +136,7 @@ export function arbitratorLabel(c: Case): string {
   // yet) have no active_tribunal row at all - fall back to the plain
   // assignment they already have.
   const assignment = activeAssignment(c);
-  return assignment ? assignment.arbitrators.full_name.toUpperCase() : 'NOT APPOINTED';
+  return assignment ? assignment.arbitrator.full_name.toUpperCase() : 'NOT APPOINTED';
 }
 
 export function disputeLine(c: Case): string {
@@ -168,7 +168,7 @@ export function buildTimeline(c: Case): TimelineEvent[] {
     events.push({
       date: assignment.due_date, // no separate "assigned_at" surfaced on AssignmentSummary yet
       title: `Arbitrator appointed`,
-      meta: `${assignment.arbitrators.full_name}`,
+      meta: `${assignment.arbitrator.full_name}`,
       tone: 'past',
     });
 
