@@ -55,7 +55,8 @@ class ArbitrationCase extends Model
 
     public function parties(): BelongsToMany
     {
-        return $this->belongsToMany(Party::class, 'case_parties', 'case_id', 'party_id')->withPivot('role');
+        return $this->belongsToMany(Party::class, 'case_parties', 'case_id', 'party_id')
+            ->withPivot('role', 'representative_name', 'representative_firm', 'representative_email', 'representative_phone');
     }
 
     public function assignments(): HasMany

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class CaseController extends Controller
@@ -294,5 +295,47 @@ class CaseController extends Controller
             ->get();
 
         return response()->json($events);
+    }
+
+    /**
+     * Records or updates the advocate/authorized representative acting for
+     * one party on this case - not a reusable directory entry, just contact
+     * info attached to the case_parties row (see migration 000042).
+     */
+    public function updatePartyRepresentative(Request $request, string $caseId, string $partyId): JsonResponse
+    {
+        $id = Ids::parse($caseId);
+        if ($id === null) {
+            return response()->json(['error' => 'Invalid case id'], 400);
+        }
+        if (! CaseAccessService::canAccess($id, Auth::user())) {
+            return response()->json(['error' => 'Case not found'], 404);
+        }
+
+        try {
+            $data = $request->validate([
+                'representativeName' => ['nullable', 'string', 'max:255'],
+                'representativeFirm' => ['nullable', 'string', 'max:255'],
+                'representativeEmail' => ['nullable', 'email', 'max:255'],
+                'representativePhone' => ['nullable', 'string', 'max:50'],
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json(['error' => $e->errors()], 400);
+        }
+
+        $updated = DB::table('case_parties')->where('case_id', $id)->where('party_id', $partyId)->update([
+            'representative_name' => $data['representativeName'] ?? null,
+            'representative_firm' => $data['representativeFirm'] ?? null,
+            'representative_email' => $data['representativeEmail'] ?? null,
+            'representative_phone' => $data['representativePhone'] ?? null,
+        ]);
+
+        if (! $updated) {
+            return response()->json(['error' => 'That party is not on this case'], 404);
+        }
+
+        \App\Services\AuditService::log(Auth::id(), 'case_party_representative_updated', 'case', $id, ['partyId' => $partyId], $request->ip());
+
+        return response()->json($this->withCaseSummary(ArbitrationCase::query())->find($id));
     }
 }
