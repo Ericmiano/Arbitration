@@ -156,35 +156,32 @@ export function Arbitrators() {
           {query ? 'No arbitrators match this search.' : 'No arbitrators on the register yet.'}
         </p>
       ) : (
-        filtered.map((a) => (
-          <Link
-            key={a.id}
-            to={`/arbitrators/${a.id}`}
-            className="no-underline text-ink cursor-pointer border-b border-hairline px-24 py-14 hover:bg-row-hover hover:text-ink flex flex-wrap gap-x-16 gap-y-4"
-          >
-            <div className="flex-[2_1_260px] min-w-0">
-              <div className="flex items-baseline gap-8">
-                <span className={`inline-block w-7 h-7 ${a.status === 'active' ? 'bg-green' : 'bg-muted-2'}`} />
+        filtered.map((a) => {
+          const secondary = [
+            [a.current_position, a.current_organization].filter(Boolean).join(', '),
+            `Score ${a.score} · ${a.cases_closed_count} closed`,
+            a.specializations.map((s) => s.specialization).join(' · '),
+          ].filter(Boolean);
+          return (
+            <Link
+              key={a.id}
+              to={`/arbitrators/${a.id}`}
+              className="no-underline text-ink cursor-pointer border-b border-hairline px-24 py-13 hover:bg-row-hover hover:text-ink flex flex-col gap-4"
+            >
+              <div className="flex items-baseline gap-10 flex-wrap">
+                <span className={`inline-block w-7 h-7 shrink-0 ${a.status === 'active' ? 'bg-green' : 'bg-muted-2'}`} />
                 <span className="text-15 font-semibold tracking-[-0.01em]">{a.full_name}</span>
+                {a.aak_membership_no && (
+                  <span className="font-mono text-10.5 text-muted">AAK {a.aak_membership_no}</span>
+                )}
+                {a.years_of_practice ? (
+                  <span className="font-mono text-10.5 text-muted">{a.years_of_practice} yrs</span>
+                ) : null}
               </div>
-              <div className="mt-4 text-13 text-ink-2">
-                {[a.current_position, a.current_organization].filter(Boolean).join(', ') || '—'}
-              </div>
-            </div>
-            <div className="flex-[1_1_120px] font-mono text-10.5 text-muted">
-              {a.aak_membership_no ? `AAK ${a.aak_membership_no}` : ''}
-            </div>
-            <div className="flex-[1_1_100px] font-mono text-10.5 text-muted">
-              {a.years_of_practice ? `${a.years_of_practice} YEARS` : ''}
-            </div>
-            <div className="flex-[1_1_140px] font-mono text-10.5 text-muted">
-              SCORE {a.score} · {a.cases_closed_count} CLOSED
-            </div>
-            <div className="flex-[2_1_220px] font-mono text-10.5 text-muted-2 tracking-[0.04em]">
-              {a.specializations.map((s) => s.specialization).join(' · ')}
-            </div>
-          </Link>
-        ))
+              <div className="text-12.5 text-muted-2">{secondary.join(' · ')}</div>
+            </Link>
+          );
+        })
       )}
     </div>
   );

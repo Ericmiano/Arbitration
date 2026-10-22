@@ -28,7 +28,6 @@ import {
   buildTimeline,
   daysBetween,
   deadlineLine,
-  disputeLine,
   formatMoney,
   formatMonoDate,
   groupKeyForCase,
@@ -51,8 +50,9 @@ function remainingSeats(tribunalType: 'sole' | 'panel', members: { role: Tribuna
   return remaining;
 }
 
-const TABS = ['Overview', 'Parties', 'Project', 'Arbitrator', 'Documents', 'Filings', 'Deadlines', 'Hearings', 'Activity'] as const;
+const TABS = ['Overview', 'Parties', 'Arbitrator', 'Documents', 'Filings & Deadlines', 'Hearings', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
+const tabSlug = (t: Tab) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
 export function CaseDetail() {
   const { caseId } = useParams();
@@ -310,10 +310,10 @@ export function CaseDetail() {
           return (
             <button
               key={t}
-              id={`case-tab-${t}`}
+              id={`case-tab-${tabSlug(t)}`}
               role="tab"
               aria-selected={active}
-              aria-controls={`case-tabpanel-${t}`}
+              aria-controls={`case-tabpanel-${tabSlug(t)}`}
               type="button"
               onClick={() => setTab(t)}
               className={`px-16 py-10 text-12.5 border-0 cursor-pointer ${
@@ -329,7 +329,7 @@ export function CaseDetail() {
       {error && <p role="alert" className="px-24 pt-14 text-13 text-red">{error}</p>}
 
       {tab === 'Overview' && (
-        <div id="case-tabpanel-Overview" role="tabpanel" aria-labelledby="case-tab-Overview" tabIndex={0} className="flex flex-wrap">
+        <div id="case-tabpanel-overview" role="tabpanel" aria-labelledby="case-tab-overview" tabIndex={0} className="flex flex-wrap">
           <div className="flex-[3_1_420px] min-w-0">
             <Titleblock caseRecord={caseRecord} />
             <ArbitratorBlock caseRecord={caseRecord} onOpenArbitratorTab={() => setTab('Arbitrator')} />
@@ -371,7 +371,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Parties' && (
-        <div id="case-tabpanel-Parties" role="tabpanel" aria-labelledby="case-tab-Parties" tabIndex={0} className="px-20 py-16">
+        <div id="case-tabpanel-parties" role="tabpanel" aria-labelledby="case-tab-parties" tabIndex={0} className="px-20 py-16">
           {caseRecord.parties.map((p) => (
             <div key={p.id} className="py-10 border-t border-hairline first:border-t-0">
               <span className="font-mono text-9.5 tracking-[0.1em] text-muted uppercase">{p.pivot.role}</span>
@@ -381,22 +381,8 @@ export function CaseDetail() {
         </div>
       )}
 
-      {tab === 'Project' && (
-        <div id="case-tabpanel-Project" role="tabpanel" aria-labelledby="case-tab-Project" tabIndex={0} className="px-20 py-16 text-13.5">
-          {caseRecord.project ? (
-            <>
-              <div className="text-15 font-semibold">{caseRecord.project.name}</div>
-              <div className="mt-4 text-ink-2">{caseRecord.project.location}</div>
-            </>
-          ) : (
-            <p className="text-muted">No project linked to this case.</p>
-          )}
-          <div className="mt-14 font-mono text-10.5 text-muted">{disputeLine(caseRecord)}</div>
-        </div>
-      )}
-
       {tab === 'Arbitrator' && (
-        <div id="case-tabpanel-Arbitrator" role="tabpanel" aria-labelledby="case-tab-Arbitrator" tabIndex={0} className="px-20 py-16">
+        <div id="case-tabpanel-arbitrator" role="tabpanel" aria-labelledby="case-tab-arbitrator" tabIndex={0} className="px-20 py-16">
           {caseRecord.basis === 'mutual_agreement' && caseRecord.status === 'pending_agreement' && isStaff && (
             <div className="mb-20 pb-20 border-b border-rule">
               <div className="font-mono text-9.5 tracking-[0.12em] text-muted">CONFIRM SUBMISSION AGREEMENT</div>
@@ -647,7 +633,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Documents' && (
-        <div id="case-tabpanel-Documents" role="tabpanel" aria-labelledby="case-tab-Documents" tabIndex={0} className="px-20 py-16">
+        <div id="case-tabpanel-documents" role="tabpanel" aria-labelledby="case-tab-documents" tabIndex={0} className="px-20 py-16">
           <form onSubmit={handleUpload} className="flex flex-wrap gap-8 items-center">
             <select name="documentType" defaultValue="evidence" className="border-0 border-b border-rule bg-transparent py-4 text-13 outline-none">
               <option value="contract_copy">Contract copy</option>
@@ -715,34 +701,35 @@ export function CaseDetail() {
         </div>
       )}
 
-      {tab === 'Filings' && (
-        <div id="case-tabpanel-Filings" role="tabpanel" aria-labelledby="case-tab-Filings" tabIndex={0} className="px-20 py-16">
-          <FilingsTab
-            caseId={caseId!}
-            filings={filings}
-            documents={documents}
-            parties={caseRecord.parties}
-            isStaff={isStaff}
-            onAction={withAsyncAction}
-          />
-        </div>
-      )}
-
-      {tab === 'Deadlines' && (
-        <div id="case-tabpanel-Deadlines" role="tabpanel" aria-labelledby="case-tab-Deadlines" tabIndex={0} className="px-20 py-16">
-          <DeadlinesTab
-            caseId={caseId!}
-            deadlines={deadlines}
-            parties={caseRecord.parties}
-            tribunalMembers={tribunal?.members ?? []}
-            isStaff={isStaff}
-            onAction={withAsyncAction}
-          />
+      {tab === 'Filings & Deadlines' && (
+        <div id="case-tabpanel-filings-deadlines" role="tabpanel" aria-labelledby="case-tab-filings-deadlines" tabIndex={0} className="px-20 py-16 flex flex-col gap-28">
+          <div>
+            <div className="mb-14 font-mono text-9.5 tracking-[0.12em] text-muted">FILINGS</div>
+            <FilingsTab
+              caseId={caseId!}
+              filings={filings}
+              documents={documents}
+              parties={caseRecord.parties}
+              isStaff={isStaff}
+              onAction={withAsyncAction}
+            />
+          </div>
+          <div className="pt-24 border-t border-rule">
+            <div className="mb-14 font-mono text-9.5 tracking-[0.12em] text-muted">DEADLINES</div>
+            <DeadlinesTab
+              caseId={caseId!}
+              deadlines={deadlines}
+              parties={caseRecord.parties}
+              tribunalMembers={tribunal?.members ?? []}
+              isStaff={isStaff}
+              onAction={withAsyncAction}
+            />
+          </div>
         </div>
       )}
 
       {tab === 'Hearings' && (
-        <div id="case-tabpanel-Hearings" role="tabpanel" aria-labelledby="case-tab-Hearings" tabIndex={0} className="px-20 py-16">
+        <div id="case-tabpanel-hearings" role="tabpanel" aria-labelledby="case-tab-hearings" tabIndex={0} className="px-20 py-16">
           {isStaff && (
             <form onSubmit={handleScheduleHearing} className="pb-20 border-b border-rule flex flex-col gap-8 max-w-[460px]">
               <div className="font-mono text-9.5 tracking-[0.12em] text-muted">SCHEDULE HEARING</div>
@@ -838,7 +825,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Activity' && (
-        <div id="case-tabpanel-Activity" role="tabpanel" aria-labelledby="case-tab-Activity" tabIndex={0} className="px-20 py-16">
+        <div id="case-tabpanel-activity" role="tabpanel" aria-labelledby="case-tab-activity" tabIndex={0} className="px-20 py-16">
           {displayTimeline.map((e, i) => (
             <div key={i} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-4 items-baseline">
               <span className="font-mono text-10.5 text-muted flex-[0_0_90px]">{formatMonoDate(e.date)}</span>
