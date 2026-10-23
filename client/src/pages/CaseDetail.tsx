@@ -661,7 +661,7 @@ export function CaseDetail() {
 
           <div className="mt-14">
             {documents.map((doc) => (
-              <div key={doc.publicId} className="py-11 border-t border-hairline">
+              <div key={doc.publicId} className="py-10 border-t border-hairline">
                 <div className="flex flex-wrap gap-x-16 gap-y-6 items-baseline">
                   <span className="flex-[1_1_250px] min-w-0 text-13.5 font-medium">{doc.fileName}</span>
                   <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">
@@ -711,7 +711,7 @@ export function CaseDetail() {
       )}
 
       {tab === 'Filings & Deadlines' && (
-        <div id="case-tabpanel-filings-deadlines" role="tabpanel" aria-labelledby="case-tab-filings-deadlines" tabIndex={0} className="px-20 py-16 flex flex-col gap-28">
+        <div id="case-tabpanel-filings-deadlines" role="tabpanel" aria-labelledby="case-tab-filings-deadlines" tabIndex={0} className="px-20 py-16 flex flex-col gap-26">
           <div>
             <div className="mb-14 font-mono text-9.5 tracking-[0.12em] text-muted">FILINGS</div>
             <FilingsTab
@@ -786,7 +786,7 @@ export function CaseDetail() {
                 .slice()
                 .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
                 .map((h) => (
-                  <div key={h.id} className="py-11 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-6 items-baseline">
+                  <div key={h.id} className="py-10 border-t border-hairline first:border-t-0 flex flex-wrap gap-x-16 gap-y-6 items-baseline">
                     <span className="flex-[0_0_170px] font-mono text-11.5">
                       {new Date(h.scheduled_at).toLocaleString(undefined, {
                         weekday: 'short',
@@ -936,7 +936,7 @@ function CaseFilePreview({ documents, onViewAll }: { documents: DocumentSummary[
       </div>
       <div className="mt-10">
         {preview.map((d) => (
-          <div key={d.publicId} className="py-11 border-t border-hairline flex flex-wrap gap-x-16 gap-y-6 items-baseline">
+          <div key={d.publicId} className="py-10 border-t border-hairline flex flex-wrap gap-x-16 gap-y-6 items-baseline">
             <span className="flex-[1_1_250px] min-w-0 text-13.5 font-medium">{d.fileName}</span>
             <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">
               {d.documentType.replace(/_/g, ' ').toUpperCase()}
@@ -946,7 +946,7 @@ function CaseFilePreview({ documents, onViewAll }: { documents: DocumentSummary[
             </span>
           </div>
         ))}
-        {preview.length === 0 && <p className="py-11 text-13 text-muted">No documents uploaded yet.</p>}
+        {preview.length === 0 && <p className="py-10 text-13 text-muted">No documents uploaded yet.</p>}
       </div>
     </div>
   );

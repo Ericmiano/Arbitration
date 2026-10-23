@@ -196,10 +196,10 @@ export function NewCase() {
           <div className="mt-8 font-mono text-10.5 tracking-[0.1em] text-muted">PARTIES · PROJECT · DISPUTE · DOCUMENTS</div>
         </div>
         <div className="flex gap-14 font-mono text-10.5 tracking-[0.04em]">
-          <Link to="/parties" className="border-b border-ink pb-1 hover:text-red hover:border-red">
+          <Link to="/parties" className="border-b border-ink pb-2 hover:text-red hover:border-red">
             + New party
           </Link>
-          <Link to="/projects" className="border-b border-ink pb-1 hover:text-red hover:border-red">
+          <Link to="/projects" className="border-b border-ink pb-2 hover:text-red hover:border-red">
             + New project/contract
           </Link>
         </div>
@@ -375,7 +375,7 @@ export function NewCase() {
                   <button
                     type="button"
                     onClick={() => handleRemoveDocument(d.id)}
-                    className="ml-auto bg-transparent border-0 border-b border-ink py-1 text-11.5 cursor-pointer hover:text-red hover:border-red"
+                    className="ml-auto bg-transparent border-0 border-b border-ink py-2 text-11.5 cursor-pointer hover:text-red hover:border-red"
                   >
                     Remove
                   </button>

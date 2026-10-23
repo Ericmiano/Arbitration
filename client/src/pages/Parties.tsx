@@ -105,7 +105,7 @@ export function Parties() {
               </Field>
               <Link
                 to="/organizations"
-                className="mt-6 inline-block font-mono text-10 tracking-[0.04em] border-b border-ink pb-1 hover:text-red hover:border-red"
+                className="mt-6 inline-block font-mono text-10 tracking-[0.04em] border-b border-ink pb-2 hover:text-red hover:border-red"
               >
                 + New organization
               </Link>

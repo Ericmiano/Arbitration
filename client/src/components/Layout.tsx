@@ -30,7 +30,7 @@ function LayoutInner() {
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <main className="min-w-0">
         <Topbar crumb={crumb} onOpenNav={() => setNavOpen(true)} />
-        <div id="main-content" className="px-16 pt-16 pb-40 md:px-26 md:pt-22 md:pb-60">
+        <div id="main-content" className="px-16 pt-16 pb-34 md:px-26 md:pt-22 md:pb-60">
           <Outlet />
         </div>
       </main>

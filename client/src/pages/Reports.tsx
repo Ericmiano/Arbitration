@@ -89,7 +89,7 @@ export function Reports() {
         <div className="flex-[1_1_260px] bg-sheet border border-ink">
           <div className="px-20 pt-16 pb-4 font-mono text-9.5 tracking-[0.12em] text-muted">AVG. RESOLUTION TIME</div>
           <div className="px-20 pb-20 pt-10">
-            <div className="font-mono text-38 font-semibold leading-none">
+            <div className="font-mono text-[38px] font-semibold leading-none">
               {data.avgResolutionDays ?? '—'}
               {data.avgResolutionDays !== null && <span className="text-15 font-normal text-muted"> days</span>}
             </div>
@@ -127,7 +127,7 @@ export function Reports() {
             <Link
               key={o.assignmentId}
               to={`/cases/${o.caseId}`}
-              className="no-underline text-ink flex flex-wrap gap-x-16 gap-y-4 items-baseline px-20 py-11 border-t border-hairline hover:bg-row-hover"
+              className="no-underline text-ink flex flex-wrap gap-x-16 gap-y-4 items-baseline px-20 py-10 border-t border-hairline hover:bg-row-hover"
             >
               <span className="font-mono text-11.5 flex-[0_0_120px]">{o.caseNumber}</span>
               <span className="flex-[1_1_200px] min-w-0 text-13.5">{o.arbitratorName}</span>
@@ -153,7 +153,7 @@ export function Reports() {
           <Link
             key={a.id}
             to={`/arbitrators/${a.id}`}
-            className="no-underline text-ink flex flex-wrap gap-x-16 gap-y-4 items-baseline px-20 py-11 border-t border-hairline hover:bg-row-hover"
+            className="no-underline text-ink flex flex-wrap gap-x-16 gap-y-4 items-baseline px-20 py-10 border-t border-hairline hover:bg-row-hover"
           >
             <span className={`w-7 h-7 inline-block ${a.status === 'active' ? 'bg-green' : 'bg-muted-2'}`} />
             <span className="flex-[1_1_220px] min-w-0 text-13.5 font-medium">{a.fullName}</span>
