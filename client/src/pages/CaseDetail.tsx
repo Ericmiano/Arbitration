@@ -19,6 +19,7 @@ import {
 import { documentDownloadUrl, listDocuments, uploadDocument, uploadDocumentVersion } from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
 import { acceptMember, appointMember, concludeCase, createTribunal, declineMember, withdrawMember } from '../api/tribunals';
+import { PartyCaseView } from '../components/PartyCaseView';
 import { useBreadcrumb } from '../context/BreadcrumbContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -106,6 +107,14 @@ export function CaseDetail() {
   useBreadcrumb(caseRecord ? `DOCKET / ${caseRecord.case_number}` : undefined);
 
   if (!caseRecord) return <p>Loading...</p>;
+
+  // Parties get a single, plain-language page instead of the staff/arbitrator
+  // case-management console - they've never been able to act on filings,
+  // deadlines, or tribunal composition from here, so the tabbed interface
+  // only ever cost them clarity.
+  if (user?.role === 'party') {
+    return <PartyCaseView caseRecord={caseRecord} documents={documents} hearings={hearings} />;
+  }
 
   const assignment = getActiveAssignment(caseRecord);
   const group = groupKeyForCase(caseRecord);
