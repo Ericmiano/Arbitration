@@ -113,7 +113,7 @@ export function CaseDetail() {
   // deadlines, or tribunal composition from here, so the tabbed interface
   // only ever cost them clarity.
   if (user?.role === 'party') {
-    return <PartyCaseView caseRecord={caseRecord} documents={documents} hearings={hearings} />;
+    return <PartyCaseView caseRecord={caseRecord} documents={documents} hearings={hearings} onDocumentUploaded={reload} />;
   }
 
   const assignment = getActiveAssignment(caseRecord);

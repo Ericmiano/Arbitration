@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Case, DocumentSummary, Hearing } from '../types';
-import { documentDownloadUrl } from '../api/documents';
+import { documentDownloadUrl, uploadDocument } from '../api/documents';
 import {
   activeAssignment,
   activeTribunal,
@@ -11,6 +12,18 @@ import {
 } from '../lib/caseDisplay';
 
 const STEPS = ['Filed', 'Arbitrator appointed', 'Hearing & review', 'Decision'] as const;
+
+const UPLOAD_TYPES: Record<string, string> = {
+  evidence: 'Supporting evidence',
+  contract_copy: 'Contract copy',
+  correspondence: 'Correspondence',
+  other: 'Other document',
+};
+
+// Matches this server's php.ini upload_max_filesize (2M) - checked client-side
+// so a party gets a clear reason instead of a silent "A file is required" from
+// a PHP-level truncation.
+const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
 function currentStep(c: Case): number {
   const group = groupKeyForCase(c);
@@ -56,10 +69,12 @@ export function PartyCaseView({
   caseRecord,
   documents,
   hearings,
+  onDocumentUploaded,
 }: {
   caseRecord: Case;
   documents: DocumentSummary[];
   hearings: Hearing[];
+  onDocumentUploaded?: () => void;
 }) {
   const { claimant, respondent } = partyLine(caseRecord);
   const step = currentStep(caseRecord);
@@ -70,6 +85,34 @@ export function PartyCaseView({
   const upcomingHearings = hearings
     .filter((h) => h.status === 'scheduled' && new Date(h.scheduled_at).getTime() >= Date.now() - 86400000)
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+
+  const [uploadType, setUploadType] = useState('evidence');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedName, setUploadedName] = useState<string | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
+
+  async function handleFileChosen(file: File | undefined) {
+    if (!file) return;
+    setUploadError(null);
+    setUploadedName(null);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError(`"${file.name}" is too large - the limit is 2MB per file.`);
+      setFileInputKey((k) => k + 1);
+      return;
+    }
+    setUploading(true);
+    try {
+      await uploadDocument(String(caseRecord.id), uploadType, file);
+      setUploadedName(file.name);
+      onDocumentUploaded?.();
+    } catch {
+      setUploadError('Could not upload that file - check it is a PDF, Word document, or image and try again.');
+    } finally {
+      setUploading(false);
+      setFileInputKey((k) => k + 1);
+    }
+  }
 
   return (
     <div className="bg-sheet border border-ink max-w-[760px] mx-auto">
@@ -176,6 +219,46 @@ export function PartyCaseView({
             ))}
           </div>
         )}
+
+        <div className="mt-16 pt-16 border-t border-rule">
+          <div className="text-13.5 font-medium text-ink-2 mb-10">
+            Add a document or supporting evidence
+          </div>
+          <div className="flex flex-wrap items-center gap-10">
+            <select
+              value={uploadType}
+              onChange={(e) => setUploadType(e.target.value)}
+              disabled={uploading}
+              className="border border-rule bg-sheet py-8 px-10 text-13.5"
+            >
+              {Object.entries(UPLOAD_TYPES).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <label className="min-h-[31px] px-14 py-6 bg-red text-white text-12.5 font-medium cursor-pointer hover:bg-red-hover inline-flex items-center">
+              {uploading ? 'Uploading...' : 'Choose file'}
+              <input
+                key={fileInputKey}
+                type="file"
+                disabled={uploading}
+                onChange={(e) => handleFileChosen(e.target.files?.[0])}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                className="hidden"
+              />
+            </label>
+          </div>
+          <p className="mt-8 text-11.5 text-muted">PDF, Word, or image - max 2MB per file.</p>
+          {uploadedName && (
+            <p className="mt-8 text-12.5 font-medium text-ink-2">"{uploadedName}" was uploaded.</p>
+          )}
+          {uploadError && (
+            <p role="alert" className="mt-8 text-12.5 font-medium text-red">
+              {uploadError}
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="px-26 py-22">
