@@ -20,10 +20,10 @@ const UPLOAD_TYPES: Record<string, string> = {
   other: 'Other document',
 };
 
-// Matches this server's php.ini upload_max_filesize (2M) - checked client-side
-// so a party gets a clear reason instead of a silent "A file is required" from
-// a PHP-level truncation.
-const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+// Matches this server's php.ini upload_max_filesize (20M) - checked
+// client-side so a party gets a clear reason instead of a silent "A file is
+// required" from a PHP-level truncation.
+const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 function currentStep(c: Case): number {
   const group = groupKeyForCase(c);
@@ -97,7 +97,7 @@ export function PartyCaseView({
     setUploadError(null);
     setUploadedName(null);
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError(`"${file.name}" is too large - the limit is 2MB per file.`);
+      setUploadError(`"${file.name}" is too large - the limit is 20MB per file.`);
       setFileInputKey((k) => k + 1);
       return;
     }
@@ -249,7 +249,7 @@ export function PartyCaseView({
               />
             </label>
           </div>
-          <p className="mt-8 text-11.5 text-muted">PDF, Word, or image - max 2MB per file.</p>
+          <p className="mt-8 text-11.5 text-muted">PDF, Word, or image - max 20MB per file.</p>
           {uploadedName && (
             <p className="mt-8 text-12.5 font-medium text-ink-2">"{uploadedName}" was uploaded.</p>
           )}

@@ -16,7 +16,13 @@ import {
   requestDeadlineExtension,
   updateDeadlineStatus,
 } from '../api/deadlines';
-import { documentDownloadUrl, listDocuments, uploadDocument, uploadDocumentVersion } from '../api/documents';
+import {
+  documentDownloadUrl,
+  listDocuments,
+  updateDocumentVisibility,
+  uploadDocument,
+  uploadDocumentVersion,
+} from '../api/documents';
 import { listHearings, scheduleHearing, updateHearing } from '../api/hearings';
 import { acceptMember, appointMember, concludeCase, createTribunal, declineMember, withdrawMember } from '../api/tribunals';
 import { PartyCaseView } from '../components/PartyCaseView';
@@ -171,6 +177,12 @@ export function CaseDetail() {
       await uploadDocumentVersion(publicId, file, reasonInput.value || undefined);
       setReplacingDoc(null);
     });
+  }
+
+  async function handleVisibilityChange(publicId: string, visibility: string) {
+    await withAsyncAction(() =>
+      updateDocumentVisibility(publicId, visibility as 'staff_arbitrator' | 'shared_all_parties' | 'uploader_only'),
+    );
   }
 
   async function handleConfirmAgreement(event: FormEvent<HTMLFormElement>) {
@@ -667,9 +679,22 @@ export function CaseDetail() {
                   <span className="flex-[0_0_104px] font-mono text-10 tracking-[0.09em] text-muted">
                     {doc.documentType.replace(/_/g, ' ').toUpperCase()}
                   </span>
-                  <span className="flex-[0_0_132px] font-mono text-10 tracking-[0.09em] text-muted-2">
-                    {doc.visibility.replace(/_/g, ' ').toUpperCase()}
-                  </span>
+                  {isStaff ? (
+                    <select
+                      value={doc.visibility}
+                      onChange={(e) => handleVisibilityChange(doc.publicId, e.target.value)}
+                      aria-label={`Visibility for ${doc.fileName}`}
+                      className="flex-[0_0_172px] font-mono text-10 tracking-[0.06em] text-muted-2 border border-rule bg-transparent py-2 px-4 uppercase"
+                    >
+                      <option value="uploader_only">UPLOADER ONLY</option>
+                      <option value="staff_arbitrator">STAFF &amp; ARBITRATOR</option>
+                      <option value="shared_all_parties">SHARED WITH ALL PARTIES</option>
+                    </select>
+                  ) : (
+                    <span className="flex-[0_0_132px] font-mono text-10 tracking-[0.09em] text-muted-2">
+                      {doc.visibility.replace(/_/g, ' ').toUpperCase()}
+                    </span>
+                  )}
                   {doc.version > 1 && (
                     <span className="font-mono text-10 tracking-[0.09em] text-amber">V{doc.version}</span>
                   )}

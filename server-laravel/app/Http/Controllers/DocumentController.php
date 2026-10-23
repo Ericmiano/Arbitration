@@ -202,6 +202,63 @@ class DocumentController extends Controller
         ]);
     }
 
+    /**
+     * Staff widening (or narrowing) a document's blanket visibility - the
+     * main use case is a party's evidence upload, which always lands as
+     * uploader_only (see store()), reaching the tribunal and the other side
+     * only once staff makes that call here.
+     */
+    public function updateVisibility(Request $request, string $publicId): JsonResponse
+    {
+        $document = Document::where('public_id', $publicId)->first();
+        if (! $document) {
+            return response()->json(['error' => 'Document not found'], 404);
+        }
+
+        try {
+            $data = $request->validate([
+                'visibility' => ['required', 'in:staff_arbitrator,shared_all_parties,uploader_only'],
+            ]);
+        } catch (ValidationException) {
+            return response()->json(['error' => 'A valid visibility value is required'], 400);
+        }
+
+        $previous = $document->visibility;
+        if ($data['visibility'] === $previous) {
+            return response()->json([
+                'publicId' => $document->public_id,
+                'visibility' => $document->visibility,
+            ]);
+        }
+
+        $document->update(['visibility' => $data['visibility']]);
+
+        $user = Auth::user();
+        AuditService::log($user->id, 'document_visibility_changed', 'document', $document->id, [
+            'from' => $previous,
+            'to' => $data['visibility'],
+        ], $request->ip());
+        CaseTimelineService::log(
+            (int) $document->case_id, 'document_visibility_changed', $user->id,
+            "Document visibility changed to \"{$this->visibilityLabel($data['visibility'])}\": {$document->file_name}",
+            referenceType: 'document', referenceId: (int) $document->id,
+        );
+
+        return response()->json([
+            'publicId' => $document->public_id,
+            'visibility' => $document->visibility,
+        ]);
+    }
+
+    private function visibilityLabel(string $visibility): string
+    {
+        return match ($visibility) {
+            'shared_all_parties' => 'Shared with all parties',
+            'staff_arbitrator' => 'Staff & arbitrator only',
+            default => 'Uploader only',
+        };
+    }
+
     private function canView(Document $document, $user): bool
     {
         if ($user->isStaff()) {

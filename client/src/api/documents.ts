@@ -30,6 +30,14 @@ export async function uploadDocument(
   return data;
 }
 
+export async function updateDocumentVisibility(
+  publicId: string,
+  visibility: 'staff_arbitrator' | 'shared_all_parties' | 'uploader_only',
+): Promise<{ publicId: string; visibility: string }> {
+  const { data } = await apiClient.patch(`/documents/${publicId}/visibility`, { visibility });
+  return data;
+}
+
 export function documentDownloadUrl(publicId: string): string {
   const base = apiClient.defaults.baseURL ?? '';
   return `${base}/documents/${publicId}`;

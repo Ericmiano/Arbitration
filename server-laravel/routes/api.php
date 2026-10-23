@@ -105,6 +105,7 @@ Route::middleware('auth.session')->group(function () {
     Route::get('/documents', [DocumentController::class, 'index']);
     Route::get('/documents/{publicId}', [DocumentController::class, 'show']);
     Route::post('/documents/{publicId}/versions', [DocumentController::class, 'storeVersion']);
+    Route::patch('/documents/{publicId}/visibility', [DocumentController::class, 'updateVisibility'])->middleware('role:admin,registrar,staff');
 
     // Hearings
     Route::get('/hearings', [HearingController::class, 'index']);
