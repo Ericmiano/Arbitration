@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import aakMark from '../assets/aak-logo-mark.webp';
 
 export function Login() {
   const { user, loading, login } = useAuth();
@@ -29,7 +30,8 @@ export function Login() {
   return (
     <div className="min-h-screen bg-app-bg flex items-center justify-center px-16">
       <div className="w-full max-w-[360px] bg-sheet border border-ink px-30 py-34">
-        <div className="font-mono text-15 font-semibold tracking-[0.16em] text-ink">
+        <img src={aakMark} alt="The Architectural Association of Kenya" className="w-54 h-54" />
+        <div className="mt-14 font-mono text-15 font-semibold tracking-[0.16em] text-ink">
           A<span className="text-red">A</span>K
         </div>
         <div className="mt-5 font-mono text-9.5 tracking-[0.14em] text-muted">ARBITRATION REGISTER</div>

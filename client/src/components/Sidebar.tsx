@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { listArbitrators } from '../api/arbitrators';
 import { listCases } from '../api/cases';
 import { useAuth } from '../context/AuthContext';
+import aakMark from '../assets/aak-logo-mark.webp';
 
 interface NavItem {
   to: string;
@@ -109,12 +110,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="px-18 pt-20 pb-16 border-b border-nav-border">
-          <div className="font-mono text-15 font-semibold tracking-[0.16em] text-nav-text-active">
-            A<span className="text-red">A</span>K
-          </div>
-          <div className="mt-5 font-mono text-9.5 tracking-[0.14em] text-nav-muted">
-            ARBITRATION REGISTER
+        <div className="px-18 pt-20 pb-16 border-b border-nav-border flex items-center gap-10">
+          <img src={aakMark} alt="" aria-hidden="true" className="w-30 h-30 shrink-0" />
+          <div>
+            <div className="font-mono text-15 font-semibold tracking-[0.16em] text-nav-text-active">
+              A<span className="text-red">A</span>K
+            </div>
+            <div className="mt-3 font-mono text-9.5 tracking-[0.14em] text-nav-muted">
+              ARBITRATION REGISTER
+            </div>
           </div>
         </div>
 
